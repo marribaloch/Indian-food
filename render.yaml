@@ -2,12 +2,12 @@ services:
   - type: web
     name: indian-food-app
     env: python
-    plan: free
     buildCommand: ""
-    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT
+    startCommand: gunicorn --bind 0.0.0.0:$PORT app:app
+    plan: free
     healthCheckPath: /healthz
     envVars:
       - key: SECRET_KEY
         value: change-this
       - key: DATABASE_URL
-        value: sqlite:////tmp/app.db
+        value: sqlite:///grab.db
