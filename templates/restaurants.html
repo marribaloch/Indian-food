@@ -1,0 +1,11 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2>Restaurants</h2>
+<ul>
+    {% for restaurant in restaurants %}
+    <li>
+        <a href="/menu/{{ restaurant.id }}">{{ restaurant.name }}</a>
+    </li>
+    {% endfor %}
+</ul>
+{% endblock %}

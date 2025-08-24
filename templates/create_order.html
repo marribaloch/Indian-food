@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Create Order - GrabEats</title>
+</head>
+<body>
+    <h1>Create New Order</h1>
+    <form method="POST">
+        <label>Customer Name:</label><br>
+        <input type="text" name="customer_name" required><br><br>
+
+        <label>Food Item:</label><br>
+        <input type="text" name="item" required><br><br>
+
+        <label>Quantity:</label><br>
+        <input type="number" name="quantity" min="1" required><br><br>
+
+        <input type="submit" value="Place Order">
+    </form>
+    <br>
+    <a href="/">← Back to Home</a>
+</body>
+</html>

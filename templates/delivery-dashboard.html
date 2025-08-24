@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Delivery Dashboard</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f0f2f5;
+    }
+    .container {
+      max-width: 800px;
+      margin: 80px auto;
+      background-color: white;
+      padding: 40px;
+      border-radius: 12px;
+      box-shadow: 0 0 20px rgba(0,0,0,0.1);
+      text-align: center;
+    }
+    h2 {
+      color: #343a40;
+    }
+    .btn {
+      display: inline-block;
+      margin-top: 20px;
+      padding: 12px 25px;
+      background-color: #17a2b8;
+      color: white;
+      text-decoration: none;
+      border-radius: 8px;
+    }
+    .btn:hover {
+      background-color: #138496;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Welcome Delivery Partner {{ username }} 🛵</h2>
+    <p>You can view assigned orders here and update delivery status.</p>
+    <a class="btn" href="/logout">Logout</a>
+  </div>
+</body>
+</html>

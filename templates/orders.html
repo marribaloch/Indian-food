@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>All Orders - GrabEats</title>
+</head>
+<body>
+    <h1>All Orders</h1>
+    <table border="1" cellpadding="8">
+        <tr>
+            <th>ID</th>
+            <th>Customer Name</th>
+            <th>Item</th>
+            <th>Quantity</th>
+        </tr>
+        {% for order in orders %}
+        <tr>
+            <td>{{ order.id }}</td>
+            <td>{{ order.customer_name }}</td>
+            <td>{{ order.item }}</td>
+            <td>{{ order.quantity }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+    <br>
+    <a href="/">← Back to Home</a>
+</body>
+</html>

@@ -1,0 +1,6 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2>Welcome to GrabEats</h2>
+<p>Select your favorite restaurant and order now!</p>
+<a href="/restaurants">Browse Restaurants</a>
+{% endblock %}

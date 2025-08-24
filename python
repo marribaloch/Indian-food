@@ -1,0 +1,22 @@
+from flask import Flask, render_template, request
+
+app = Flask(__name__)
+
+@app.route('/')
+def menu():
+    return render_template('menu.html')
+
+@app.route('/order')
+def order():
+    return render_template('order.html')
+
+@app.route('/submit-order', methods=['POST'])
+def submit_order():
+    name = request.form['name']
+    item = request.form['item']
+    quantity = request.form['quantity']
+    
+    return f"Thank you, {name}! Your order for {quantity} x {item} has been received."
+
+if __name__ == '__main__':
+    app.run(debug=True)

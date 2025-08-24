@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Dashboard | GrabFood App</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: linear-gradient(to right, #f8f9fa, #e9ecef);
+      margin: 0;
+      padding: 0;
+    }
+    .container {
+      max-width: 700px;
+      margin: 100px auto;
+      background-color: white;
+      border-radius: 12px;
+      box-shadow: 0 0 20px rgba(0,0,0,0.1);
+      padding: 40px;
+      text-align: center;
+    }
+    h2 {
+      margin-bottom: 10px;
+      color: #343a40;
+    }
+    p {
+      margin-bottom: 30px;
+      font-size: 18px;
+      color: #555;
+    }
+    .btn {
+      display: inline-block;
+      margin: 10px;
+      padding: 12px 25px;
+      background-color: #007bff;
+      color: white;
+      text-decoration: none;
+      border-radius: 8px;
+      font-weight: bold;
+      transition: background 0.3s;
+    }
+    .btn:hover {
+      background-color: #0056b3;
+    }
+    .logout {
+      background-color: #dc3545;
+    }
+    .logout:hover {
+      background-color: #c82333;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Welcome, {{ username }} 👋</h2>
+    <p>You are now logged in to the GrabFood App dashboard.</p>
+
+    <a href="/menu" class="btn">🍽 View Menu</a>
+    <a href="/order" class="btn">🛒 Place Order</a>
+    <a href="/logout" class="btn logout">🚪 Logout</a>
+  </div>
+</body>
+</html>

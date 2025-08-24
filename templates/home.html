@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>GrabEats Home</title>
+</head>
+<body>
+    <h1>Welcome to GrabEats</h1>
+
+    {% if 'user' in session %}
+        <p>You are logged in as <strong>{{ session['user'] }}</strong></p>
+        <a href="/create-order">➕ Create Order</a> |
+        <a href="/orders">📋 View Orders</a> |
+        <a href="/logout">🔓 Logout</a>
+    {% else %}
+        <a href="/login">🔐 Admin Login</a>
+    {% endif %}
+</body>
+</html>

@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Admin - All Orders</title>
+</head>
+<body>
+    <h1>All Orders (Admin View)</h1>
+
+    {% if orders %}
+        <table border="1">
+            <tr>
+                <th>Customer Name</th>
+                <th>Item</th>
+                <th>Quantity</th>
+                <th>Time</th>
+            </tr>
+            {% for order in orders %}
+            <tr>
+                <td>{{ order.name }}</td>
+                <td>{{ order.item }}</td>
+                <td>{{ order.quantity }}</td>
+                <td>{{ order.timestamp }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+    {% else %}
+        <p>No orders yet.</p>
+    {% endif %}
+
+    <br>
+    <a href="/">Back to Menu</a>
+</body>
+</html>
