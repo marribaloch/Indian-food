@@ -5,3 +5,13 @@ services:
     buildCommand: ""
     startCommand: gunicorn app:app
     plan: free
+    healthCheckPath: /healthz
+    envVars:
+      - key: SECRET_KEY
+        value: change-this
+      - key: DATABASE_URL
+        value: sqlite:////var/data/app.db
+    disk:
+      name: app-data
+      mountPath: /var/data
+      sizeGB: 1
