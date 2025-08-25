@@ -1,67 +1,33 @@
-import os
-import sqlite3
-from flask import Flask, request, render_template, redirect, session
-from werkzeug.security import check_password_hash
+from flask import Flask, render_template, redirect, url_for
 
 app = Flask(__name__)
 
-# Secret key: set via ENV on Render, defaults locally
-app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "change-this")
-
-# Database path: Render uses sqlite:////var/data/app.db, locally fallback to grab.db
-DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///grab.db")
-
-def _sqlite_path_from_url(url: str) -> str:
-    if url.startswith("sqlite:////"):
-        return url.replace("sqlite:////", "/")
-    if url.startswith("sqlite:///"):
-        return url.replace("sqlite:///", "")
-    return url
-
-DB_PATH = _sqlite_path_from_url(DATABASE_URL)
-
-def get_db_connection():
-    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
-    conn.row_factory = sqlite3.Row
-    return conn
-
-
-# ---------------- Routes ----------------
-
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
-
-        conn = get_db_connection()
-        user = conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
-        conn.close()
-
-        if user and check_password_hash(user['password'], password):
-            session['user_id'] = user['id']
-            session['username'] = user['username']
-            session['role'] = user['role']
-
-            # Redirect based on role
-            if user['role'] == 'admin':
-                return redirect('/admin-dashboard')
-            elif user['role'] == 'delivery':
-                return redirect('/delivery-dashboard')
-            else:
-                return redirect('/dashboard')
-        else:
-            return "Invalid username or password"
-
-    return render_template('login.html')
-
-
-# Health check route
+# health check (Render ke liye)
 @app.route("/healthz")
 def healthz():
     return "ok", 200
 
+# Home ko login par bhej dein (ya menu chahen to url_for("menu"))
+@app.route("/")
+def home():
+    return redirect(url_for("login"))
 
-# ---------------- Run ----------------
-if __name__ == "__main__":
-    app.run()
+@app.route("/login")
+def login():
+    return render_template("login.html")
+
+@app.route("/register")
+def register():
+    return render_template("register.html")
+
+@app.route("/menu")
+def menu():
+    return render_template("menu.html")
+
+@app.route("/order")
+def order():
+    return render_template("order.html")
+
+@app.route("/admin")
+def admin():
+    return render_template("admin-dashboard.html")
