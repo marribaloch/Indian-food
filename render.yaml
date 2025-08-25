@@ -2,9 +2,10 @@ services:
   - type: web
     name: indian-food-app
     env: python
-    buildCommand: ""
+    buildCommand: pip install -r requirements.txt
     startCommand: gunicorn app:app --bind 0.0.0.0:$PORT
     plan: free
+    healthCheckPath: /healthz
     envVars:
       - key: SECRET_KEY
         value: change-this
