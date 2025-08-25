@@ -1,30 +1,23 @@
 import sqlite3
+from pathlib import Path
 
-def create_tables():
-    conn = sqlite3.connect('app.db')
-    c = conn.cursor()
+DB_PATH = Path(__file__).with_name("grab.db")
 
-    # Create users table with role column
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT UNIQUE NOT NULL,
-            password TEXT NOT NULL,
-            role TEXT DEFAULT 'customer'
-        )
-    ''')
+schema = """
+PRAGMA journal_mode=WAL;
 
-    # Create orders table (optional - included for completeness)
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS orders (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            food TEXT NOT NULL
-        )
-    ''')
+CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    email TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+"""
 
+if __name__ == "__main__":
+    conn = sqlite3.connect(DB_PATH)
+    conn.executescript(schema)
     conn.commit()
     conn.close()
-
-# Run it once to create tables
-create_tables()
+    print(f"DB initialized at {DB_PATH.name}")

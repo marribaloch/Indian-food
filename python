@@ -1,22 +1,84 @@
-from flask import Flask, render_template, request
+import sqlite3, os
+from flask import Flask, render_template, redirect, url_for, request, session, flash
+from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
+app.secret_key = os.environ.get("SECRET_KEY", "dev-key")  # change in prod
+DB = "grab.db"
 
-@app.route('/')
-def menu():
-    return render_template('menu.html')
+def db():
+    conn = sqlite3.connect(DB)
+    conn.row_factory = sqlite3.Row
+    return conn
 
-@app.route('/order')
-def order():
-    return render_template('order.html')
+# first-run: make users table if not exists
+with db() as conn:
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS users(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            email TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL
+        )
+    """)
+    conn.commit()
 
-@app.route('/submit-order', methods=['POST'])
-def submit_order():
-    name = request.form['name']
-    item = request.form['item']
-    quantity = request.form['quantity']
-    
-    return f"Thank you, {name}! Your order for {quantity} x {item} has been received."
+@app.route("/healthz")
+def healthz(): return "ok", 200
 
-if __name__ == '__main__':
+@app.route("/")
+def home(): return redirect(url_for("login"))
+
+@app.route("/login", methods=["GET","POST"])
+def login():
+    if request.method == "POST":
+        email = request.form.get("email","").strip().lower()
+        password = request.form.get("password","")
+        with db() as conn:
+            u = conn.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
+        if u and check_password_hash(u["password_hash"], password):
+            session["uid"] = u["id"]; session["name"] = u["name"]
+            flash("Logged in!", "success")
+            return redirect(url_for("menu"))
+        flash("Invalid email or password", "error")
+    return render_template("login.html")
+
+@app.route("/register", methods=["GET","POST"])
+def register():
+    if request.method == "POST":
+        name = request.form.get("name","").strip()
+        email = request.form.get("email","").strip().lower()
+        password = request.form.get("password","")
+        if not name or not email or not password:
+            flash("All fields are required", "error")
+            return render_template("register.html")
+        try:
+            with db() as conn:
+                conn.execute(
+                    "INSERT INTO users(name,email,password_hash) VALUES (?,?,?)",
+                    (name, email, generate_password_hash(password))
+                )
+                conn.commit()
+            flash("Account created, please login", "success")
+            return redirect(url_for("login"))
+        except sqlite3.IntegrityError:
+            flash("Email already registered", "error")
+    return render_template("register.html")
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    flash("Logged out", "info")
+    return redirect(url_for("login"))
+
+@app.route("/menu")
+def menu(): return render_template("menu.html")
+
+@app.route("/order")
+def order(): return render_template("order.html")
+
+@app.route("/admin")
+def admin(): return render_template("admin-dashboard.html")
+
+if __name__ == "__main__":
     app.run(debug=True)
