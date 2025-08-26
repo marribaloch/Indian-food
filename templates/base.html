@@ -4,10 +4,7 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>{{ title or "Grab App" }}</title>
   <link rel="stylesheet" href="https://unpkg.com/mvp.css">
-  <style>
-    nav a{margin-right:.6rem}
-    .badge{padding:.15rem .45rem;border-radius:.4rem;background:#eee}
-  </style>
+  <style>nav a{margin-right:.6rem}.badge{padding:.15rem .45rem;border-radius:.4rem;background:#eee}</style>
 </head>
 <body>
 <header>
@@ -16,12 +13,11 @@
     <a href="{{ url_for('driver_home') }}">Driver</a>
     {% if is_admin %}
       <a href="{{ url_for('admin') }}">Admin</a>
-      <!-- yeh naya link hai: Menu Admin (CRUD screens) -->
       <a href="{{ url_for('admin_menu') }}">Menu Admin</a>
     {% endif %}
     <span class="badge">Restaurant: {{ rid if rid else '' }}</span>
     <span style="float:right">
-      {% if current_user.id %}
+      {% if current_user %}
         Hello, {{ current_user.name }} · <a href="{{ url_for('logout') }}">Logout</a>
       {% else %}
         <a href="{{ url_for('login') }}">Login</a> · <a href="{{ url_for('register') }}">Register</a>
