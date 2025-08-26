@@ -1,74 +1,13 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>Our Menu | GrabFood App</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background-color: #f6f8fa;
-      margin: 0;
-      padding: 0;
-    }
-    .menu-container {
-      max-width: 1000px;
-      margin: 60px auto;
-      padding: 20px;
-      background-color: #fff;
-      border-radius: 12px;
-      box-shadow: 0 0 20px rgba(0,0,0,0.05);
-    }
-    h2 {
-      text-align: center;
-      margin-bottom: 30px;
-      color: #333;
-    }
-    .category {
-      margin-bottom: 30px;
-    }
-    .category h3 {
-      border-left: 6px solid #007bff;
-      padding-left: 10px;
-      color: #007bff;
-    }
-    .item {
-      display: flex;
-      justify-content: space-between;
-      padding: 10px 0;
-      border-bottom: 1px solid #eee;
-    }
-    .item:last-child {
-      border-bottom: none;
-    }
-  </style>
-</head>
-<body>
-  <div class="menu-container">
-    <h2>🍽 Our Menu</h2>
-
-    <div class="category">
-      <h3>Chicken Dishes</h3>
-      <div class="item"><span>Butter Chicken</span><span>120,000 VND</span></div>
-      <div class="item"><span>Chicken Biryani</span><span>100,000 VND</span></div>
-    </div>
-
-    <div class="category">
-      <h3>Veg Dishes</h3>
-      <div class="item"><span>Paneer Butter Masala</span><span>90,000 VND</span></div>
-      <div class="item"><span>Veg Pulao</span><span>80,000 VND</span></div>
-    </div>
-
-    <div class="category">
-      <h3>Drinks</h3>
-      <div class="item"><span>Mango Lassi</span><span>40,000 VND</span></div>
-      <div class="item"><span>Masala Chai</span><span>25,000 VND</span></div>
-    </div>
-
-    <div class="category">
-      <h3>Breads</h3>
-      <div class="item"><span>Garlic Naan</span><span>20,000 VND</span></div>
-      <div class="item"><span>Butter Roti</span><span>15,000 VND</span></div>
-    </div>
-  </div>
-</body>
-</html>
+{% extends "base.html" %}{% block content %}
+<h2>Order</h2>
+{% if chosen %}
+  <p><strong>{{ chosen.name }}</strong> — {{ "%.0f"|format(chosen.price) }} VND</p>
+  <form method="post">
+    <input type="hidden" name="item_id" value="{{ chosen.id }}">
+    <label>Quantity <input type="number" name="qty" min="1" value="1" required></label>
+    <button type="submit">Place order</button>
+  </form>
+{% else %}
+  <p>Select an item from the <a href="{{ url_for('menu') }}">menu</a>.</p>
+{% endif %}
+{% endblock %}

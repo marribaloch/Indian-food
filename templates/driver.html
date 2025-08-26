@@ -1,0 +1,10 @@
+{% extends "base.html" %}{% block content %}
+<h2>Driver — Jobs</h2>
+<ul>
+  {% for j in jobs %}
+    <li>#{{ j.id }} — {{ j.rest }} — {{ "%.0f"|format(j.total) }} VND — {{ j.status }}</li>
+  {% else %}
+    <li>No jobs yet.</li>
+  {% endfor %}
+</ul>
+{% endblock %}

@@ -1,16 +1,9 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Register</title>
-</head>
-<body>
-    <h2>Register</h2>
-    <form method="POST">
-        <input type="text" name="name" placeholder="Name" required><br>
-        <input type="email" name="email" placeholder="Email" required><br>
-        <input type="password" name="password" placeholder="Password" required><br>
-        <button type="submit">Create Account</button>
-    </form>
-    <p>Already have an account? <a href="/login">Login</a></p>
-</body>
-</html>
+{% extends "base.html" %}{% block content %}
+<h2>Create account</h2>
+<form method="post">
+  <label>Name <input name="name" required></label>
+  <label>Email <input name="email" type="email" required></label>
+  <label>Password <input name="password" type="password" required></label>
+  <button type="submit">Register</button>
+</form>
+{% endblock %}

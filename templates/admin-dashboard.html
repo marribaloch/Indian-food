@@ -1,10 +1,29 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Admin Dashboard</title>
-</head>
-<body>
-    <h2>Admin Dashboard</h2>
-    <p>Welcome, Admin!</p>
-</body>
-</html>
+{% extends "base.html" %}{% block content %}
+<h2>Admin — Orders</h2>
+<table>
+  <thead><tr><th>ID</th><th>Restaurant</th><th>Customer</th><th>Total</th><th>Status</th><th>Driver</th><th>Actions</th></tr></thead>
+  <tbody>
+    {% for o in orders %}
+    <tr>
+      <td>#{{ o.id }}</td>
+      <td>{{ o.rest or "-" }}</td>
+      <td>{{ o.customer or "-" }}</td>
+      <td>{{ "%.0f"|format(o.total) }} VND</td>
+      <td>{{ o.status }}</td>
+      <td>{{ o.driver_id or "-" }}</td>
+      <td>
+        {% for s in ["pending","preparing","ready","picked_up","delivered","cancelled"] %}
+          <a href="{{ url_for('admin_order_status', oid=o.id, status=s) }}">{{ s }}</a>{% if not loop.last %} · {% endif %}
+        {% endfor %}
+        {% if o.status in ["ready","preparing","pending"] %}
+          <br>Assign:
+          {% for d in drivers %}
+            <a href="{{ url_for('admin_assign_driver', oid=o.id, driver_id=d.id) }}">{{ d.name }}</a>{% if not loop.last %} · {% endif %}
+          {% endfor %}
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h2>Edit Item #{{ item.id }}</h2>
+
+<form method="post">
+  <label>Name
+    <input name="name" value="{{ item.name }}" required>
+  </label>
+
+  <label>Description
+    <input name="description" value="{{ item.description or '' }}">
+  </label>
+
+  <label>Price (VND)
+    <input name="price" inputmode="decimal" value="{{ '%.0f'|format(item.price) }}" required>
+  </label>
+
+  <label>Restaurant
+    <select name="restaurant_id">
+      {% for r in restaurants %}
+        <option value="{{ r.id }}" {% if r.id==item.restaurant_id %}selected{% endif %}>{{ r.name }}</option>
+      {% endfor %}
+    </select>
+  </label>
+
+  <button type="submit">Save</button>
+  <a href="{{ url_for('admin_menu', r=item.restaurant_id) }}">Cancel</a>
+</form>
+
+{% endblock %}

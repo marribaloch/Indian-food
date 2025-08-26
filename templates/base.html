@@ -1,24 +1,46 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>GrabEats</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>{{ title or "Grab App" }}</title>
+  <link rel="stylesheet" href="https://unpkg.com/mvp.css">
+  <style>
+    nav a{margin-right:.6rem}
+    .badge{padding:.15rem .45rem;border-radius:.4rem;background:#eee}
+  </style>
 </head>
 <body>
-    <header>
-        <h1><a href="/">GrabEats</a></h1>
-        <nav>
-            <a href="/">Home</a> |
-            <a href="/restaurants">Restaurants</a> |
-            <a href="/orders">My Orders</a>
-        </nav>
-        <hr>
-    </header>
+<header>
+  <nav>
+    <a href="{{ url_for('menu') }}">Menu</a>
+    <a href="{{ url_for('driver_home') }}">Driver</a>
+    {% if is_admin %}
+      <a href="{{ url_for('admin') }}">Admin</a>
+      <!-- yeh naya link hai: Menu Admin (CRUD screens) -->
+      <a href="{{ url_for('admin_menu') }}">Menu Admin</a>
+    {% endif %}
+    <span class="badge">Restaurant: {{ rid if rid else '' }}</span>
+    <span style="float:right">
+      {% if current_user.id %}
+        Hello, {{ current_user.name }} · <a href="{{ url_for('logout') }}">Logout</a>
+      {% else %}
+        <a href="{{ url_for('login') }}">Login</a> · <a href="{{ url_for('register') }}">Register</a>
+      {% endif %}
+    </span>
+  </nav>
+</header>
 
-    <main>
-        {% block content %}
-        {% endblock %}
-    </main>
+<main>
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <section>
+        {% for cat,msg in messages %}
+          <p class="badge">{{ cat|upper }}: {{ msg }}</p>
+        {% endfor %}
+      </section>
+    {% endif %}
+  {% endwith %}
+  {% block content %}{% endblock %}
+</main>
 </body>
 </html>
