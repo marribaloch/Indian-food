@@ -9,13 +9,15 @@
       h1 { margin: 0 0 16px; }
       .toolbar { display: flex; gap: 12px; margin-bottom: 16px; }
       .row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
-      select, input { padding: 6px 8px; }
+      .row input, .row select { padding: 6px 8px; }
       button { padding: 6px 12px; cursor: pointer; }
       table { border-collapse: collapse; width: 100%; margin-top: 12px; }
       th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
       .total { text-align: right; font-weight: 700; margin-top: 10px; }
       .ok { color: #0a0; font-weight: 600; }
       .err { color: #a00; font-weight: 600; }
+      .section { margin: 12px 0; padding: 10px; border: 1px dashed #bbb; border-radius: 8px; }
+      label { min-width: 110px; }
     </style>
   </head>
   <body>
@@ -24,6 +26,17 @@
     <div class="toolbar">
       <a href="/menu">Menu</a>
       <a href="/admin">Admin</a>
+    </div>
+
+    <div class="section">
+      <h3 style="margin-top:0">Customer</h3>
+      <div class="row">
+        <label for="custName">Name:</label>
+        <input id="custName" placeholder="e.g. Ali Khan (default Walk-in)" />
+        <label for="custPhone">Phone:</label>
+        <input id="custPhone" placeholder="e.g. 0300-1234567" />
+      </div>
+      <small>Note: Agar blank chhorain to 'Walk-in' save hoga.</small>
     </div>
 
     <div class="row">
@@ -55,6 +68,8 @@
 
       const sel = document.getElementById('item');
       const qty = document.getElementById('qty');
+      const nameInput = document.getElementById('custName');
+      const phoneInput = document.getElementById('custPhone');
       const add = document.getElementById('add');
       const tableBody = document.querySelector('#cartTable tbody');
       const grand = document.getElementById('grand');
@@ -88,18 +103,24 @@
         if (!cart.length) { msg.textContent = 'Add at least one item'; msg.className='err'; return; }
         msg.textContent = 'Submitting...'; msg.className='';
         try {
+          const payload = {
+            items: cart,
+            customer_name: nameInput.value.trim(),
+            phone: phoneInput.value.trim()
+          };
           const res = await fetch('/api/orders', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ items: cart })
+            body: JSON.stringify(payload)
           });
           const data = await res.json();
           if (data.ok) {
             msg.textContent = `Order #${data.order_id} created. Total: ${data.total} VND`;
             msg.className='ok';
             cart.length = 0; render();
+            nameInput.value = ''; phoneInput.value = '';
           } else {
-            msg.textContent = data.error || 'Failed';
+            msg.textContent = data.error || data.message || 'Failed';
             msg.className='err';
           }
         } catch (e) {

@@ -19,7 +19,7 @@ def home():
 def login_page():
     return ("OK", 200)
 
-# ----- SEED & DEBUG -----
+# ----- SEED -----
 @app.route("/seed")
 def seed_menu():
     con = get_db()
@@ -49,6 +49,7 @@ def seed_menu():
     finally:
         con.close()
 
+# ----- Public APIs -----
 @app.route("/api/items")
 def api_items():
     con = get_db()
@@ -60,7 +61,39 @@ def api_items():
     finally:
         con.close()
 
-# ----- MENU (read-only) -----
+@app.route("/api/healthz")
+def healthz():
+    con = get_db()
+    con.execute("SELECT 1")
+    con.close()
+    return jsonify({"ok": True})
+
+@app.route("/api/login", methods=["POST"])
+def api_login():
+    data = request.get_json(silent=True) or {}
+    email = (data.get("email") or "").strip().lower()
+    password = data.get("password") or ""
+    if not email or not password:
+        return jsonify({"message": "Email and password required"}), 400
+
+    con = get_db()
+    cur = con.cursor()
+    cur.execute("SELECT id, name, email, password_hash, role FROM users WHERE email = ?", (email,))
+    row = cur.fetchone()
+    con.close()
+    if not row:
+        return jsonify({"message": "Invalid credentials"}), 401
+
+    if not check_password_hash(row["password_hash"], password):
+        return jsonify({"message": "Invalid credentials"}), 401
+
+    token = f"tok_{row['id']}"
+    return jsonify({
+        "token": token,
+        "user": {"id": row["id"], "name": row["name"], "email": row["email"], "role": row["role"]}
+    })
+
+# ----- Pages -----
 @app.route("/menu")
 def menu():
     con = get_db()
@@ -80,7 +113,6 @@ def menu():
         con.close()
     return render_template("menu.html", items=items)
 
-# ----- ORDER (page) -----
 @app.route("/order")
 def order_page():
     con = get_db()
@@ -99,12 +131,14 @@ def order_page():
         con.close()
     return render_template("order.html", items=items)
 
-# ----- API: create order -----
+# ----- Create Order (NOW supports customer name + phone) -----
 @app.route("/api/orders", methods=["POST"])
 def api_create_order():
     data = request.get_json(silent=True) or {}
-    items = data.get("items") or []
-    customer_id = data.get("customer_id")
+    items = data.get("items") or []         # [{menu_item_id, qty}]
+    customer_name = (data.get("customer_name") or "").strip()
+    phone = (data.get("phone") or "").strip()
+    customer_id = data.get("customer_id")   # optional direct id
 
     if not items:
         return jsonify({"message": "No items provided"}), 400
@@ -112,7 +146,8 @@ def api_create_order():
     con = get_db()
     try:
         cur = con.cursor()
-        # Ensure tables exist
+
+        # Ensure tables
         cur.execute("""CREATE TABLE IF NOT EXISTS customers (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
@@ -140,12 +175,36 @@ def api_create_order():
             price INTEGER NOT NULL
         )""")
 
-        # Default customer = Walk-in
-        if not customer_id:
+        # Resolve customer
+        if customer_id:
+            pass
+        elif phone:
+            cur.execute("SELECT id FROM customers WHERE phone = ?", (phone,))
+            r = cur.fetchone()
+            if r:
+                customer_id = r["id"]
+                # update name if provided
+                if customer_name:
+                    cur.execute("UPDATE customers SET name = ? WHERE id = ?", (customer_name, customer_id))
+            else:
+                nm = customer_name if customer_name else "Walk-in"
+                cur.execute("INSERT INTO customers(name, phone) VALUES(?,?)", (nm, phone))
+                customer_id = cur.lastrowid
+        elif customer_name:
+            cur.execute("SELECT id FROM customers WHERE name = ?", (customer_name,))
+            r = cur.fetchone()
+            if r:
+                customer_id = r["id"]
+            else:
+                cur.execute("INSERT INTO customers(name, phone) VALUES(?,?)", (customer_name, None))
+                customer_id = cur.lastrowid
+        else:
+            # Default Walk-in
             cur.execute("SELECT id FROM customers WHERE name = 'Walk-in'")
             r = cur.fetchone()
-            customer_id = r["id"] if r else None
-            if not customer_id:
+            if r:
+                customer_id = r["id"]
+            else:
                 cur.execute("INSERT INTO customers(name, phone) VALUES(?,?)", ("Walk-in", None))
                 customer_id = cur.lastrowid
 
@@ -155,11 +214,12 @@ def api_create_order():
                     (customer_id, 0, now))
         order_id = cur.lastrowid
 
+        # Insert order items + calc total
         total = 0
         for it in items:
             mid = int(it.get("menu_item_id"))
             qty = int(it.get("qty") or 0)
-            if qty <= 0: 
+            if qty <= 0:
                 continue
             cur.execute("SELECT price FROM menu_items WHERE id = ?", (mid,))
             row = cur.fetchone()
@@ -179,13 +239,13 @@ def api_create_order():
     finally:
         con.close()
 
-# ----- ADMIN: orders list (with total) -----
+# ----- Admin (shows name + phone) -----
 @app.route("/admin")
 def admin_view():
     con = get_db()
     try:
         cur = con.cursor()
-        # Ensure ALL tables exist
+        # Ensure tables
         cur.execute("""CREATE TABLE IF NOT EXISTS customers (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
@@ -213,13 +273,13 @@ def admin_view():
             price INTEGER NOT NULL
         )""")
 
-        # Orders summary (includes total)
         cur.execute("""
             SELECT
-              o.id            AS order_id,
+              o.id AS order_id,
               COALESCE(c.name, 'Walk-in') AS customer_name,
+              c.phone AS phone,
               COALESCE(o.total, 0) AS total_vnd,
-              o.created_at    AS created_at,
+              o.created_at AS created_at,
               GROUP_CONCAT(mi.name || ' x' || oi.qty, ', ') AS items_summary
             FROM orders o
             LEFT JOIN customers   c  ON c.id = o.customer_id
@@ -232,6 +292,7 @@ def admin_view():
         orders = [{
             "order_id": r["order_id"],
             "customer_name": r["customer_name"],
+            "phone": r["phone"] or "",
             "total_vnd": r["total_vnd"] or 0,
             "created_at": r["created_at"],
             "items_summary": r["items_summary"] or ""
@@ -239,41 +300,6 @@ def admin_view():
     finally:
         con.close()
     return render_template("admin.html", orders=orders)
-
-# ----- Health & Login -----
-@app.route("/api/healthz")
-def healthz():
-    con = get_db()
-    con.execute("SELECT 1")
-    con.close()
-    return jsonify({"ok": True})
-
-@app.route("/api/login", methods=["POST"])
-def api_login():
-    data = request.get_json(silent=True) or {}
-    email = (data.get("email") or "").strip().lower()
-    password = data.get("password") or ""
-
-    if not email or not password:
-        return jsonify({"message": "Email and password required"}), 400
-
-    con = get_db()
-    cur = con.cursor()
-    cur.execute("SELECT id, name, email, password_hash, role FROM users WHERE email = ?", (email,))
-    row = cur.fetchone()
-    con.close()
-
-    if not row:
-        return jsonify({"message": "Invalid credentials"}), 401
-
-    if not check_password_hash(row["password_hash"], password):
-        return jsonify({"message": "Invalid credentials"}), 401
-
-    token = f"tok_{row['id']}"
-    return jsonify({
-        "token": token,
-        "user": {"id": row["id"], "name": row["name"], "email": row["email"], "role": row["role"]}
-    })
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)

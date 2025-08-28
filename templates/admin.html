@@ -12,7 +12,6 @@
       th, td { border: 1px solid #ddd; padding: 8px; text-align: left; vertical-align: top; }
       th { background: #f7f7f7; }
       td.total { text-align: right; font-weight: 600; }
-      .empty { margin-top: 12px; color: #a00; }
       small { opacity: 0.7; }
     </style>
   </head>
@@ -40,7 +39,10 @@
             <tr>
               <td>{{ o.order_id }}</td>
               <td>{{ o.created_at }}</td>
-              <td>{{ o.customer_name }}</td>
+              <td>
+                {{ o.customer_name }}
+                {% if o.phone %}<br><small>{{ o.phone }}</small>{% endif %}
+              </td>
               <td>{{ o.items_summary or '-' }}</td>
               <td class="total">{{ o.total_vnd }}</td>
             </tr>
@@ -49,7 +51,7 @@
       </table>
       <small>Tip: Create a few orders on the <a href="/order">Create Order</a> page and refresh.</small>
     {% else %}
-      <div class="empty">No orders yet. Go to <a href="/order">Create Order</a> and add one.</div>
+      <div>No orders yet. Go to <a href="/order">Create Order</a> and add one.</div>
     {% endif %}
   </body>
 </html>
