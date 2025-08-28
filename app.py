@@ -179,13 +179,13 @@ def api_create_order():
     finally:
         con.close()
 
-# ----- ADMIN: orders list -----
+# ----- ADMIN: orders list (with total) -----
 @app.route("/admin")
 def admin_view():
     con = get_db()
     try:
         cur = con.cursor()
-        # Ensure ALL tables exist (including menu_items)
+        # Ensure ALL tables exist
         cur.execute("""CREATE TABLE IF NOT EXISTS customers (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
@@ -213,12 +213,12 @@ def admin_view():
             price INTEGER NOT NULL
         )""")
 
-        # Aggregate items per order
+        # Orders summary (includes total)
         cur.execute("""
             SELECT
               o.id            AS order_id,
               COALESCE(c.name, 'Walk-in') AS customer_name,
-              o.total         AS total_vnd,
+              COALESCE(o.total, 0) AS total_vnd,
               o.created_at    AS created_at,
               GROUP_CONCAT(mi.name || ' x' || oi.qty, ', ') AS items_summary
             FROM orders o

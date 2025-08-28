@@ -11,6 +11,7 @@
       table { border-collapse: collapse; width: 100%; }
       th, td { border: 1px solid #ddd; padding: 8px; text-align: left; vertical-align: top; }
       th { background: #f7f7f7; }
+      td.total { text-align: right; font-weight: 600; }
       .empty { margin-top: 12px; color: #a00; }
       small { opacity: 0.7; }
     </style>
@@ -41,7 +42,7 @@
               <td>{{ o.created_at }}</td>
               <td>{{ o.customer_name }}</td>
               <td>{{ o.items_summary or '-' }}</td>
-              <td>{{ o.total_vnd }}</td>
+              <td class="total">{{ o.total_vnd }}</td>
             </tr>
           {% endfor %}
         </tbody>
