@@ -1,52 +1,51 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Admin Orders</title>
-    <!-- CSS -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-  </head>
-  <body>
-    <header>
-      <h1><a href="/">Admin Orders</a></h1>
-      <nav>
-        <a href="{{ url_for('menu') }}">Menu</a>
-        <a href="{{ url_for('order_page') }}">Order</a>
-        <a href="{{ url_for('customers_view') }}">Customers</a>
-      </nav>
-    </header>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Orders (Admin)</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<header class="appbar">
+  <h1><a href="/admin">Orders (Admin)</a></h1>
+  <nav>
+    <a href="/menu">Menu</a>
+    <a href="/order">Create Order</a>
+    <a href="/customers">Customers</a>
+  </nav>
+</header>
 
-    <main>
-      <h2>All Orders</h2>
-      {% if orders and orders|length %}
-      <table>
-        <thead>
+<main class="container">
+  <table class="table">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Created at</th>
+        <th>Customer</th>
+        <th>Items</th>
+        <th>Total (VND)</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% if orders and orders|length > 0 %}
+        {% for o in orders %}
           <tr>
-            <th>ID</th>
-            <th>Customer</th>
-            <th>Phone</th>
-            <th>Items</th>
-            <th>Total (VND)</th>
-            <th>Created</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for o in orders %}
-          <tr>
-            <td>{{ o.order_id }}</td>
-            <td>{{ o.customer_name }}</td>
-            <td>{{ o.phone or '-' }}</td>
-            <td>{{ o.items_summary }}</td>
-            <td>{{ o.total_vnd }}</td>
+            <td>{{ o.id }}</td>
             <td>{{ o.created_at }}</td>
+            <td>
+              {{ o.customer_name or 'Walk-in' }}<br>
+              <span class="muted">{{ o.customer_phone or '' }}</span>
+            </td>
+            <td>{{ o.items_summary }}</td>
+            <td>{{ o.total }}</td>
           </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+        {% endfor %}
       {% else %}
-        <p>No orders yet. Pehle <a href="{{ url_for('order_page') }}">Order Page</a> se ek order banaiye.</p>
+        <tr><td colspan="5" class="muted">No orders yet. Go to <a href="/order">Create Order</a> and add one.</td></tr>
       {% endif %}
-    </main>
-  </body>
+    </tbody>
+  </table>
+</main>
+</body>
 </html>

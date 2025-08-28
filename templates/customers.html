@@ -1,52 +1,48 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Customers</title>
-    <!-- CSS -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-  </head>
-  <body>
-    <header>
-      <h1><a href="/">Customers</a></h1>
-      <nav>
-        <a href="{{ url_for('menu') }}">Menu</a>
-        <a href="{{ url_for('order_page') }}">Order</a>
-        <a href="{{ url_for('admin_view') }}">Admin</a>
-        <strong>Customers</strong>
-      </nav>
-    </header>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Customers</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<header class="appbar">
+  <h1><a href="/customers">Customers</a></h1>
+  <nav>
+    <a href="/menu">Menu</a>
+    <a href="/order">Create Order</a>
+    <a href="/admin">Admin</a>
+  </nav>
+</header>
 
-    <main>
-      <h2>All Customers</h2>
-
-      {% if rows and rows|length %}
-      <table>
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>Name</th>
-            <th>Phone</th>
-            <th>Total Orders</th>
-            <th>Last Order</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for r in rows %}
+<main class="container">
+  <table class="table">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Name</th>
+        <th>Phone</th>
+        <th>Total Orders</th>
+        <th>Last Order</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% if customers and customers|length > 0 %}
+        {% for c in customers %}
           <tr>
             <td>{{ loop.index }}</td>
-            <td>{{ r.name or 'Walk-in' }}</td>
-            <td>{{ r.phone or '-' }}</td>
-            <td>{{ r.total_orders }}</td>
-            <td>{{ r.last_order_at or '-' }}</td>
+            <td>{{ c.name }}</td>
+            <td>{{ c.phone or '' }}</td>
+            <td>{{ c.total_orders or 0 }}</td>
+            <td>{{ c.last_order_at or '' }}</td>
           </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+        {% endfor %}
       {% else %}
-        <p>No customers yet. Pehle <a href="{{ url_for('order_page') }}">Create Order</a> pe ek order bana lein.</p>
+        <tr><td colspan="5" class="muted">No customers yet.</td></tr>
       {% endif %}
-    </main>
-  </body>
+    </tbody>
+  </table>
+</main>
+</body>
 </html>
