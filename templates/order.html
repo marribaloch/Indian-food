@@ -1,13 +1,112 @@
-{% extends "base.html" %}{% block content %}
-<h2>Order</h2>
-{% if chosen %}
-  <p><strong>{{ chosen.name }}</strong> — {{ "%.0f"|format(chosen.price) }} VND</p>
-  <form method="post">
-    <input type="hidden" name="item_id" value="{{ chosen.id }}">
-    <label>Quantity <input type="number" name="qty" min="1" value="1" required></label>
-    <button type="submit">Place order</button>
-  </form>
-{% else %}
-  <p>Select an item from the <a href="{{ url_for('menu') }}">menu</a>.</p>
-{% endif %}
-{% endblock %}
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Create Order</title>
+    <style>
+      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 24px; }
+      h1 { margin: 0 0 16px; }
+      .toolbar { display: flex; gap: 12px; margin-bottom: 16px; }
+      .row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+      select, input { padding: 6px 8px; }
+      button { padding: 6px 12px; cursor: pointer; }
+      table { border-collapse: collapse; width: 100%; margin-top: 12px; }
+      th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+      .total { text-align: right; font-weight: 700; margin-top: 10px; }
+      .ok { color: #0a0; font-weight: 600; }
+      .err { color: #a00; font-weight: 600; }
+    </style>
+  </head>
+  <body>
+    <h1>Create Order</h1>
+
+    <div class="toolbar">
+      <a href="/menu">Menu</a>
+      <a href="/admin">Admin</a>
+    </div>
+
+    <div class="row">
+      <label for="item">Item:</label>
+      <select id="item">
+        {% for it in items %}
+          <option value="{{ it.id }}" data-price="{{ it.price }}">{{ it.name }} — {{ it.price }} VND</option>
+        {% endfor %}
+      </select>
+
+      <label for="qty">Qty:</label>
+      <input id="qty" type="number" min="1" value="1" />
+      <button id="add">Add</button>
+    </div>
+
+    <table id="cartTable">
+      <thead><tr><th>#</th><th>Item</th><th>Qty</th><th>Price each</th><th>Line total</th></tr></thead>
+      <tbody></tbody>
+    </table>
+
+    <div class="total">Total: <span id="grand">0</span> VND</div>
+
+    <button id="submit">Submit Order</button>
+    <div id="msg"></div>
+
+    <script>
+      const items = {{ items|tojson }};
+      const cart = [];
+
+      const sel = document.getElementById('item');
+      const qty = document.getElementById('qty');
+      const add = document.getElementById('add');
+      const tableBody = document.querySelector('#cartTable tbody');
+      const grand = document.getElementById('grand');
+      const submitBtn = document.getElementById('submit');
+      const msg = document.getElementById('msg');
+
+      function render() {
+        tableBody.innerHTML = '';
+        let total = 0;
+        cart.forEach((c, i) => {
+          const line = c.qty * c.price;
+          total += line;
+          const tr = document.createElement('tr');
+          tr.innerHTML = `<td>${i+1}</td><td>${c.name}</td><td>${c.qty}</td><td>${c.price}</td><td>${line}</td>`;
+          tableBody.appendChild(tr);
+        });
+        grand.textContent = total;
+      }
+
+      add.onclick = () => {
+        const id = parseInt(sel.value, 10);
+        const name = sel.options[sel.selectedIndex].text.split(' — ')[0];
+        const price = parseInt(sel.options[sel.selectedIndex].dataset.price, 10);
+        const q = parseInt(qty.value || '1', 10);
+        if (q <= 0) return;
+        cart.push({ menu_item_id: id, name, price, qty: q });
+        render();
+      };
+
+      submitBtn.onclick = async () => {
+        if (!cart.length) { msg.textContent = 'Add at least one item'; msg.className='err'; return; }
+        msg.textContent = 'Submitting...'; msg.className='';
+        try {
+          const res = await fetch('/api/orders', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ items: cart })
+          });
+          const data = await res.json();
+          if (data.ok) {
+            msg.textContent = `Order #${data.order_id} created. Total: ${data.total} VND`;
+            msg.className='ok';
+            cart.length = 0; render();
+          } else {
+            msg.textContent = data.error || 'Failed';
+            msg.className='err';
+          }
+        } catch (e) {
+          msg.textContent = e.message;
+          msg.className='err';
+        }
+      };
+    </script>
+  </body>
+</html>
