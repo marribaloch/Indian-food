@@ -86,6 +86,13 @@ def order_page():
     con = get_db()
     try:
         cur = con.cursor()
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS menu_items (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                price INTEGER NOT NULL
+            )
+        """)
         cur.execute("SELECT id, name, price FROM menu_items ORDER BY id ASC")
         items = [{"id": r["id"], "name": r["name"], "price": r["price"]} for r in cur.fetchall()]
     finally:
@@ -127,6 +134,11 @@ def api_create_order():
             FOREIGN KEY(order_id) REFERENCES orders(id),
             FOREIGN KEY(menu_item_id) REFERENCES menu_items(id)
         )""")
+        cur.execute("""CREATE TABLE IF NOT EXISTS menu_items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            price INTEGER NOT NULL
+        )""")
 
         # Default customer = Walk-in
         if not customer_id:
@@ -167,13 +179,13 @@ def api_create_order():
     finally:
         con.close()
 
-# ----- ADMIN: orders list (NEW) -----
+# ----- ADMIN: orders list -----
 @app.route("/admin")
 def admin_view():
     con = get_db()
     try:
         cur = con.cursor()
-        # Make sure tables exist so the page never crashes on fresh DB
+        # Ensure ALL tables exist (including menu_items)
         cur.execute("""CREATE TABLE IF NOT EXISTS customers (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
@@ -195,8 +207,13 @@ def admin_view():
             FOREIGN KEY(order_id) REFERENCES orders(id),
             FOREIGN KEY(menu_item_id) REFERENCES menu_items(id)
         )""")
+        cur.execute("""CREATE TABLE IF NOT EXISTS menu_items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            price INTEGER NOT NULL
+        )""")
 
-        # Aggregate items per order using GROUP_CONCAT
+        # Aggregate items per order
         cur.execute("""
             SELECT
               o.id            AS order_id,
@@ -205,9 +222,9 @@ def admin_view():
               o.created_at    AS created_at,
               GROUP_CONCAT(mi.name || ' x' || oi.qty, ', ') AS items_summary
             FROM orders o
-            LEFT JOIN customers c   ON c.id = o.customer_id
+            LEFT JOIN customers   c  ON c.id = o.customer_id
             LEFT JOIN order_items oi ON oi.order_id = o.id
-            LEFT JOIN menu_items mi  ON mi.id = oi.menu_item_id
+            LEFT JOIN menu_items  mi ON mi.id = oi.menu_item_id
             GROUP BY o.id
             ORDER BY o.id DESC
         """)
@@ -223,7 +240,7 @@ def admin_view():
         con.close()
     return render_template("admin.html", orders=orders)
 
-# ----- Health & Login (same) -----
+# ----- Health & Login -----
 @app.route("/api/healthz")
 def healthz():
     con = get_db()
@@ -249,7 +266,6 @@ def api_login():
     if not row:
         return jsonify({"message": "Invalid credentials"}), 401
 
-    # if row["password_hash"] != password: return jsonify({"message": "Invalid credentials"}), 401
     if not check_password_hash(row["password_hash"], password):
         return jsonify({"message": "Invalid credentials"}), 401
 
