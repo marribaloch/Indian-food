@@ -1,27 +1,54 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Admin Panel - Orders</title>
-</head>
-<body>
-    <h1>All Orders</h1>
-    <table border="1" cellpadding="10">
-        <tr>
-            <th>ID</th>
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Admin — Orders</title>
+    <style>
+      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 24px; }
+      h1 { margin: 0 0 16px; }
+      .toolbar { display: flex; gap: 12px; margin-bottom: 16px; }
+      table { border-collapse: collapse; width: 100%; }
+      th, td { border: 1px solid #ddd; padding: 8px; text-align: left; vertical-align: top; }
+      th { background: #f7f7f7; }
+      .empty { margin-top: 12px; color: #a00; }
+      small { opacity: 0.7; }
+    </style>
+  </head>
+  <body>
+    <h1>Orders (Admin)</h1>
+
+    <div class="toolbar">
+      <a href="/menu">Menu</a>
+      <a href="/order">Create Order</a>
+    </div>
+
+    {% if orders and orders|length > 0 %}
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Created at</th>
             <th>Customer</th>
-            <th>Item</th>
-            <th>Quantity</th>
-            <th>Time</th>
-        </tr>
-        {% for order in orders %}
-        <tr>
-            <td>{{ order[0] }}</td>
-            <td>{{ order[1] }}</td>
-            <td>{{ order[2] }}</td>
-            <td>{{ order[3] }}</td>
-            <td>{{ order[4] }}</td>
-        </tr>
-        {% endfor %}
-    </table>
-</body>
+            <th>Items</th>
+            <th>Total (VND)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for o in orders %}
+            <tr>
+              <td>{{ o.order_id }}</td>
+              <td>{{ o.created_at }}</td>
+              <td>{{ o.customer_name }}</td>
+              <td>{{ o.items_summary or '-' }}</td>
+              <td>{{ o.total_vnd }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <small>Tip: Create a few orders on the <a href="/order">Create Order</a> page and refresh.</small>
+    {% else %}
+      <div class="empty">No orders yet. Go to <a href="/order">Create Order</a> and add one.</div>
+    {% endif %}
+  </body>
 </html>
