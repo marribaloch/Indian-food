@@ -41,9 +41,12 @@
 
     <div class="row">
       <label for="item">Item:</label>
-      <select id="item">
+      <select id="item" style="min-width:260px">
+        <option value="" selected disabled>— Select item —</option>
         {% for it in items %}
-          <option value="{{ it.id }}" data-price="{{ it.price }}">{{ it.name }} — {{ it.price }} VND</option>
+          <option value="{{ it.id }}" data-price="{{ it.price }}">
+            {{ it.name }} — {{ it.price }} VND
+          </option>
         {% endfor %}
       </select>
 
@@ -90,11 +93,16 @@
       }
 
       add.onclick = () => {
-        const id = parseInt(sel.value, 10);
-        const name = sel.options[sel.selectedIndex].text.split(' — ')[0];
-        const price = parseInt(sel.options[sel.selectedIndex].dataset.price, 10);
+        const selVal = sel.value;
+        if (!selVal) { alert('Pehlay item select karein'); return; }
+
+        const id = parseInt(selVal, 10);
+        const opt = sel.options[sel.selectedIndex];
+        const name = opt.text.split(' — ')[0];
+        const price = parseInt(opt.dataset.price, 10);
         const q = parseInt(qty.value || '1', 10);
         if (q <= 0) return;
+
         cart.push({ menu_item_id: id, name, price, qty: q });
         render();
       };
