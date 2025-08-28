@@ -239,7 +239,27 @@ def admin_view():
     finally:
         con.close()
     return render_template("admin.html", orders=orders)
-
+# --- NEW: Customers list page (/customers) ---
+@app.route("/customers")
+def customers_view():
+    con = get_db()
+    cur = con.cursor()
+    # Customers + unke orders ka summary (count + last order time)
+    cur.execute("""
+        SELECT
+            c.id,
+            COALESCE(NULLIF(TRIM(c.name), ''), 'Walk-in') AS name,
+            c.phone,
+            COUNT(o.id)            AS total_orders,
+            MAX(o.created_at)      AS last_order_at
+        FROM customers c
+        LEFT JOIN orders o ON o.customer_id = c.id
+        GROUP BY c.id
+        ORDER BY total_orders DESC, name ASC
+    """)
+    rows = [dict(r) for r in cur.fetchall()]
+    con.close()
+    return render_template("customers.html", rows=rows)
 # ----- Health -----
 @app.route("/api/healthz")
 def healthz():

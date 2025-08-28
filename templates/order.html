@@ -4,79 +4,60 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Create Order</title>
-    <style>
-      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 24px; }
-      h1 { margin: 0 0 16px; }
-      .toolbar { display: flex; gap: 12px; margin-bottom: 16px; }
-      .row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
-      .row input, .row select { padding: 6px 8px; }
-      button { padding: 6px 12px; cursor: pointer; }
-      table { border-collapse: collapse; width: 100%; margin-top: 12px; }
-      th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-      .total { text-align: right; font-weight: 700; margin-top: 10px; }
-      .ok { color: #0a0; font-weight: 600; }
-      .err { color: #a00; font-weight: 600; }
-      .section { margin: 12px 0; padding: 10px; border: 1px dashed #bbb; border-radius: 8px; }
-      label { min-width: 110px; }
-    </style>
+    <!-- CSS from static -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
   </head>
   <body>
-    <h1>Create Order</h1>
+    <header>
+      <h1><a href="/">Create Order</a></h1>
+      <nav>
+        <a href="{{ url_for('menu') }}">Menu</a>
+        <a href="{{ url_for('admin_view') }}">Admin</a>
+        <a href="{{ url_for('customers_view') }}">Customers</a>
+      </nav>
+    </header>
 
-    <div class="toolbar">
-      <a href="/menu">Menu</a>
-      <a href="/admin">Admin</a>
-    </div>
-
-    <div class="section">
-      <h3 style="margin-top:0">Customer</h3>
-      <div class="row">
-        <label for="custName">Name:</label>
-        <input id="custName" placeholder="e.g. Ali Khan (default Walk-in)" />
-        <label for="custPhone">Phone:</label>
-        <input id="custPhone" placeholder="e.g. 0300-1234567" />
+    <main>
+      <h2>Customer Info</h2>
+      <div>
+        <label>Name: <input id="custName" placeholder="Ali Khan (default Walk-in)" /></label>
+        <label>Phone: <input id="custPhone" placeholder="0300-1234567" /></label>
       </div>
-      <small>Note: Agar blank chhorain to 'Walk-in' save hoga.</small>
-    </div>
 
-    <div class="row">
-      <label for="item">Item:</label>
-      <select id="item" style="min-width:260px">
-        <option value="" selected disabled>— Select item —</option>
-        {% for it in items %}
-          <option value="{{ it.id }}" data-price="{{ it.price }}">
-            {{ it.name }} — {{ it.price }} VND
-          </option>
-        {% endfor %}
-      </select>
+      <h2>Add Items</h2>
+      <div>
+        <select id="item">
+          <option value="" disabled selected>— Select item —</option>
+          {% for it in items %}
+            <option value="{{ it.id }}" data-price="{{ it.price }}">
+              {{ it.name }} — {{ it.price }} VND
+            </option>
+          {% endfor %}
+        </select>
+        <input id="qty" type="number" min="1" value="1" />
+        <button id="add">Add</button>
+      </div>
 
-      <label for="qty">Qty:</label>
-      <input id="qty" type="number" min="1" value="1" />
-      <button id="add">Add</button>
-    </div>
+      <table id="cartTable">
+        <thead><tr><th>#</th><th>Item</th><th>Qty</th><th>Price each</th><th>Line total</th></tr></thead>
+        <tbody></tbody>
+      </table>
 
-    <table id="cartTable">
-      <thead><tr><th>#</th><th>Item</th><th>Qty</th><th>Price each</th><th>Line total</th></tr></thead>
-      <tbody></tbody>
-    </table>
-
-    <div class="total">Total: <span id="grand">0</span> VND</div>
-
-    <button id="submit">Submit Order</button>
-    <div id="msg"></div>
+      <div class="total">Total: <span id="grand">0</span> VND</div>
+      <button id="submit">Submit Order</button>
+      <div id="msg"></div>
+    </main>
 
     <script>
       const items = {{ items|tojson }};
       const cart = [];
-
       const sel = document.getElementById('item');
       const qty = document.getElementById('qty');
       const nameInput = document.getElementById('custName');
       const phoneInput = document.getElementById('custPhone');
-      const add = document.getElementById('add');
+      const addBtn = document.getElementById('add');
       const tableBody = document.querySelector('#cartTable tbody');
       const grand = document.getElementById('grand');
-      const submitBtn = document.getElementById('submit');
       const msg = document.getElementById('msg');
 
       function render() {
@@ -92,49 +73,40 @@
         grand.textContent = total;
       }
 
-      add.onclick = () => {
-        const selVal = sel.value;
-        if (!selVal) { alert('Pehlay item select karein'); return; }
-
-        const id = parseInt(selVal, 10);
+      addBtn.onclick = () => {
+        const id = parseInt(sel.value);
+        if (!id) { alert("Pehlay item select karein"); return; }
         const opt = sel.options[sel.selectedIndex];
         const name = opt.text.split(' — ')[0];
-        const price = parseInt(opt.dataset.price, 10);
-        const q = parseInt(qty.value || '1', 10);
+        const price = parseInt(opt.dataset.price);
+        const q = parseInt(qty.value || "1");
         if (q <= 0) return;
-
         cart.push({ menu_item_id: id, name, price, qty: q });
         render();
       };
 
-      submitBtn.onclick = async () => {
-        if (!cart.length) { msg.textContent = 'Add at least one item'; msg.className='err'; return; }
-        msg.textContent = 'Submitting...'; msg.className='';
+      document.getElementById('submit').onclick = async () => {
+        if (!cart.length) { msg.textContent = "Add at least one item"; return; }
+        msg.textContent = "Submitting...";
+        const payload = {
+          items: cart,
+          customer_name: nameInput.value.trim(),
+          phone: phoneInput.value.trim()
+        };
         try {
-          const payload = {
-            items: cart,
-            customer_name: nameInput.value.trim(),
-            phone: phoneInput.value.trim()
-          };
           const res = await fetch('/api/orders', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {'Content-Type':'application/json'},
             body: JSON.stringify(payload)
           });
           const data = await res.json();
           if (data.ok) {
             msg.textContent = `Order #${data.order_id} created. Total: ${data.total} VND`;
-            msg.className='ok';
-            cart.length = 0; render();
-            nameInput.value = ''; phoneInput.value = '';
+            cart.length = 0; render(); nameInput.value=''; phoneInput.value='';
           } else {
-            msg.textContent = data.error || data.message || 'Failed';
-            msg.className='err';
+            msg.textContent = data.error || "Failed";
           }
-        } catch (e) {
-          msg.textContent = e.message;
-          msg.className='err';
-        }
+        } catch (e) { msg.textContent = e.message; }
       };
     </script>
   </body>

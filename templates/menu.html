@@ -4,38 +4,37 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Menu</title>
-    <style>
-      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 24px; }
-      h1 { margin: 0 0 16px; }
-      .toolbar { display: flex; gap: 12px; margin-bottom: 16px; }
-      .card { border: 1px solid #ddd; border-radius: 8px; padding: 12px 14px; margin-bottom: 10px; }
-      .name { font-weight: 600; }
-      .price { opacity: 0.8; }
-      .empty { padding: 12px; border: 1px dashed #bbb; border-radius: 8px; }
-      a { text-decoration: none; }
-    </style>
+    <!-- Static CSS link -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
   </head>
   <body>
-    <h1>Menu</h1>
+    <header>
+      <h1><a href="/">Menu</a></h1>
+      <nav>
+        <a href="/login">Login</a>
+        <a href="/order">Order</a>
+        <a href="/admin">Admin</a>
+      </nav>
+    </header>
 
-    <div class="toolbar">
-      <a href="/login">Login</a>
-      <a href="/order">Order</a>
-      <a href="/admin">Admin</a>
-    </div>
+    <main>
+      <h2>Our Dishes</h2>
 
-    {% if items and items|length > 0 %}
-      {% for it in items %}
-        <div class="card">
-          <div class="name">#{{ it.id }} — {{ it.name }}</div>
-          <div class="price">{{ it.price }} VND</div>
+      {% if items and items|length > 0 %}
+        <ul>
+          {% for it in items %}
+            <li>
+              <strong>#{{ it.id }} — {{ it.name }}</strong>  
+              <span>{{ it.price }} VND</span>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <div class="empty">
+          No items yet.<br />
+          (Tip: run <code>python db_setup.py</code> once to seed sample items like Butter Chicken, Biryani, etc.)
         </div>
-      {% endfor %}
-    {% else %}
-      <div class="empty">
-        No items yet.<br />
-        (Tip: run <code>python db_setup.py</code> once to seed sample items like Butter Chicken, Biryani, etc.)
-      </div>
-    {% endif %}
+      {% endif %}
+    </main>
   </body>
 </html>

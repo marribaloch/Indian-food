@@ -3,55 +3,50 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Admin — Orders</title>
-    <style>
-      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 24px; }
-      h1 { margin: 0 0 16px; }
-      .toolbar { display: flex; gap: 12px; margin-bottom: 16px; }
-      table { border-collapse: collapse; width: 100%; }
-      th, td { border: 1px solid #ddd; padding: 8px; text-align: left; vertical-align: top; }
-      th { background: #f7f7f7; }
-      td.total { text-align: right; font-weight: 600; }
-      small { opacity: 0.7; }
-    </style>
+    <title>Admin Orders</title>
+    <!-- CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
   </head>
   <body>
-    <h1>Orders (Admin)</h1>
+    <header>
+      <h1><a href="/">Admin Orders</a></h1>
+      <nav>
+        <a href="{{ url_for('menu') }}">Menu</a>
+        <a href="{{ url_for('order_page') }}">Order</a>
+        <a href="{{ url_for('customers_view') }}">Customers</a>
+      </nav>
+    </header>
 
-    <div class="toolbar">
-      <a href="/menu">Menu</a>
-      <a href="/order">Create Order</a>
-    </div>
-
-    {% if orders and orders|length > 0 %}
+    <main>
+      <h2>All Orders</h2>
+      {% if orders and orders|length %}
       <table>
         <thead>
           <tr>
-            <th>#</th>
-            <th>Created at</th>
+            <th>ID</th>
             <th>Customer</th>
+            <th>Phone</th>
             <th>Items</th>
             <th>Total (VND)</th>
+            <th>Created</th>
           </tr>
         </thead>
         <tbody>
           {% for o in orders %}
-            <tr>
-              <td>{{ o.order_id }}</td>
-              <td>{{ o.created_at }}</td>
-              <td>
-                {{ o.customer_name }}
-                {% if o.phone %}<br><small>{{ o.phone }}</small>{% endif %}
-              </td>
-              <td>{{ o.items_summary or '-' }}</td>
-              <td class="total">{{ o.total_vnd }}</td>
-            </tr>
+          <tr>
+            <td>{{ o.order_id }}</td>
+            <td>{{ o.customer_name }}</td>
+            <td>{{ o.phone or '-' }}</td>
+            <td>{{ o.items_summary }}</td>
+            <td>{{ o.total_vnd }}</td>
+            <td>{{ o.created_at }}</td>
+          </tr>
           {% endfor %}
         </tbody>
       </table>
-      <small>Tip: Create a few orders on the <a href="/order">Create Order</a> page and refresh.</small>
-    {% else %}
-      <div>No orders yet. Go to <a href="/order">Create Order</a> and add one.</div>
-    {% endif %}
+      {% else %}
+        <p>No orders yet. Pehle <a href="{{ url_for('order_page') }}">Order Page</a> se ek order banaiye.</p>
+      {% endif %}
+    </main>
   </body>
 </html>
