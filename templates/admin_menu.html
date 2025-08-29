@@ -2,84 +2,65 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Admin • Menu</title>
+  <title>Admin Menu</title>
   <style>
-    body{font-family:system-ui,Arial;margin:40px}
-    table{border-collapse:collapse;width:100%;margin-top:16px}
-    th,td{border:1px solid #ddd;padding:8px}
-    th{background:#f5f5f5;text-align:left}
-    form.inline{display:inline}
-    input,select,button{padding:8px;margin:4px 0}
-    .row{display:flex;gap:12px;flex-wrap:wrap}
-    .card{border:1px solid #eee;padding:16px;border-radius:6px}
-    .right{float:right}
-    .muted{color:#888}
-    .flash{background:#fff3cd;border:1px solid #ffe69c;padding:8px;margin-bottom:12px}
-    a{color:#333;text-decoration:none}
-    a:hover{text-decoration:underline}
+    body{font-family:system-ui,Segoe UI,Arial;margin:24px}
+    table{border-collapse:collapse;width:100%}
+    th,td{border:1px solid #ddd;padding:8px;text-align:left}
+    th{background:#f5f5f5}
+    .actions{display:flex;gap:8px}
+    form{display:inline}
+    button{cursor:pointer}
   </style>
 </head>
 <body>
   <h1>Admin Menu</h1>
-  <div class="right"><a href="{{ url_for('menu') }}">View public Menu</a></div>
 
-  {% with messages = get_flashed_messages() %}
-    {% if messages %}
-      {% for m in messages %}<div class="flash">{{ m }}</div>{% endfor %}
+  {% with msgs = get_flashed_messages(with_categories=false) %}
+    {% if msgs %}
+      <ul>
+        {% for m in msgs %}<li>{{ m }}</li>{% endfor %}
+      </ul>
     {% endif %}
   {% endwith %}
 
-  <div class="card">
-    <h3>Add item</h3>
-    <form method="post" action="{{ url_for('admin_menu_add') }}">
-      <div class="row">
-        <div>
-          <label>Name<br><input name="name" required></label>
-        </div>
-        <div>
-          <label>Price (e.g. 59000)<br><input name="price" required></label>
-        </div>
-        <div>
-          <label>Category<br>
-            <select name="category">
-              <option value="">— Select —</option>
-              <option>Biryani</option>
-              <option>Curry</option>
-              <option>BBQ</option>
-              <option>Naan/Roti</option>
-              <option>Drink</option>
-              <option>Dessert</option>
-            </select>
-          </label>
-        </div>
-      </div>
-      <button type="submit">Add</button>
-    </form>
-  </div>
-
-  <h3 style="margin-top:24px">Items</h3>
   <table>
-    <tr><th>#</th><th>Name</th><th>Price</th><th>Category</th><th>Status</th><th>Actions</th></tr>
-    {% for it in items %}
-      <tr>
-        <td>{{ it.id }}</td>
-        <td>{{ it.name }}</td>
-        <td>{{ it.price|vnd }}</td>
-        <td>{{ it.category or '-' }}</td>
-        <td>{% if it.available %}Available{% else %}<span class="muted">Hidden</span>{% endif %}</td>
-        <td>
-          <a href="{{ url_for('admin_menu_edit', item_id=it.id) }}">Edit</a> •
-          <form class="inline" method="post" action="{{ url_for('admin_menu_toggle', item_id=it.id) }}">
-            <button type="submit">{% if it.available %}Hide{% else %}Show{% endif %}</button>
-          </form> •
-          <form class="inline" method="post" action="{{ url_for('admin_menu_delete', item_id=it.id) }}" onsubmit="return confirm('Delete this item?')">
-            <button type="submit">Delete</button>
-          </form>
-        </td>
-      </tr>
-    {% else %}
-      <tr><td colspan="6"><em>No items yet.</em></td></tr>
+    <tr>
+      <th>ID</th><th>Name</th><th>Price</th><th>Avail</th><th>Actions</th>
+    </tr>
+    {% for item in items %}
+    <tr>
+      <td>{{ item['id'] }}</td>
+      <td>{{ item['name'] }}</td>
+      <td>{{ item['price']|vnd }}</td>
+      <td>
+        {% if 'available' in item.keys() %}
+          {{  'Yes' if item['available'] else 'No' }}
+        {% else %}
+          —
+        {% endif %}
+      </td>
+      <td class="actions">
+        <!-- Edit -->
+        <a href="{{ url_for('admin_menu_edit', item_id=item['id']) }}">
+          Edit
+        </a>
+
+        <!-- Toggle (POST) -->
+        <form method="post" action="{{ url_for('admin_menu_toggle', item_id=item['id']) }}">
+          <button type="submit">Toggle</button>
+        </form>
+
+        <!-- Delete (POST) -->
+        <form method="post" action="{{ url_for('admin_menu_delete', item_id=item['id']) }}"
+              onsubmit="return confirm('Delete this item?');">
+          <button type="submit">Delete</button>
+        </form>
+      </td>
+    </tr>
     {% endfor %}
   </table>
+
+  <p style="margin-top:16px"><a href="{{ url_for('menu') }}">⬅ Back to public menu</a></p>
 </body>
 </html>
