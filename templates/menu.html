@@ -1,40 +1,36 @@
 <!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Menu</title>
-    <!-- Static CSS link -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-  </head>
-  <body>
-    <header>
-      <h1><a href="/">Menu</a></h1>
-      <nav>
-        <a href="/login">Login</a>
-        <a href="/order">Order</a>
-        <a href="/admin">Admin</a>
-      </nav>
-    </header>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Indian Food App • Menu</title>
+  <style>
+    body{font-family:system-ui,Arial;margin:40px}
+    .muted{color:#888}
+    table{border-collapse:collapse;width:100%;margin-top:12px}
+    th,td{border:1px solid #ddd;padding:8px}
+    th{background:#f5f5f5;text-align:left}
+    a{color:#333;text-decoration:none}
+    a:hover{text-decoration:underline}
+  </style>
+</head>
+<body>
+  <div style="float:right"><a href="{{ url_for('admin_menu') }}">Admin</a></div>
+  <h1>Indian Food App</h1>
+  <h2>Menu</h2>
 
-    <main>
-      <h2>Our Dishes</h2>
-
-      {% if items and items|length > 0 %}
-        <ul>
-          {% for it in items %}
-            <li>
-              <strong>#{{ it.id }} — {{ it.name }}</strong>  
-              <span>{{ it.price }} VND</span>
-            </li>
-          {% endfor %}
-        </ul>
-      {% else %}
-        <div class="empty">
-          No items yet.<br />
-          (Tip: run <code>python db_setup.py</code> once to seed sample items like Butter Chicken, Biryani, etc.)
-        </div>
-      {% endif %}
-    </main>
-  </body>
+  {% if items and items|length %}
+    <table>
+      <tr><th>Name</th><th>Category</th><th>Price</th></tr>
+      {% for it in items %}
+        <tr>
+          <td>{{ it.name }}</td>
+          <td>{{ it.category or '-' }}</td>
+          <td>{{ it.price|vnd }}</td>
+        </tr>
+      {% endfor %}
+    </table>
+  {% else %}
+    <p class="muted">No items yet. (Ask Admin to add some.)</p>
+  {% endif %}
+</body>
 </html>

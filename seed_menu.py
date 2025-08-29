@@ -1,33 +1,23 @@
+# seed_menu.py
 import sqlite3
 
-DB = "grab.db"
+DB_FILE = "grab.db"
 
-ITEMS = [
-    ("Butter Chicken", 159000),
-    ("Chicken Biryani", 129000),
-    ("Garlic Naan", 25000),
-    ("Paneer Tikka", 139000),
-    ("Masala Chai", 29000),
+items = [
+    ("Butter Chicken", 120000, "https://i.imgur.com/6w7Q2GQ.jpeg"),
+    ("Dal Tadka", 85000, "https://i.imgur.com/1iJg4fT.jpeg"),
+    ("Chicken Biryani", 130000, "https://i.imgur.com/0F2s3xP.jpeg"),
+    ("Garlic Naan", 30000,  "https://i.imgur.com/jbO3CwY.jpeg"),
 ]
 
-def seed_menu():
-    conn = sqlite3.connect(DB)
+def seed():
+    conn = sqlite3.connect(DB_FILE)
     cur = conn.cursor()
-
-    # Use restaurant_id = 1 (Main Restaurant)
-    restaurant_id = 1
-
-    # Clear current items (optional)
-    cur.execute("DELETE FROM menu_items")
-
-    cur.executemany(
-        "INSERT INTO menu_items (name, price, restaurant_id) VALUES (?, ?, ?)",
-        [(n, p, restaurant_id) for (n, p) in ITEMS]
-    )
-
+    for name, price, img in items:
+        cur.execute("INSERT INTO menu_items (name, price, image_url, is_active) VALUES (?,?,?,1)", (name, price, img))
     conn.commit()
     conn.close()
-    print(f"[seed_menu] Inserted {len(ITEMS)} items into {DB}")
+    print("Menu seeded.")
 
 if __name__ == "__main__":
-    seed_menu()
+    seed()

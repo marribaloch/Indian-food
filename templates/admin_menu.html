@@ -37,10 +37,20 @@
           <label>Name<br><input name="name" required></label>
         </div>
         <div>
-          <label>Price (e.g. 5.99)<br><input name="price" required></label>
+          <label>Price (e.g. 59000)<br><input name="price" required></label>
         </div>
         <div>
-          <label>Category<br><input name="category" placeholder="Biryani / Curry / Drink"></label>
+          <label>Category<br>
+            <select name="category">
+              <option value="">— Select —</option>
+              <option>Biryani</option>
+              <option>Curry</option>
+              <option>BBQ</option>
+              <option>Naan/Roti</option>
+              <option>Drink</option>
+              <option>Dessert</option>
+            </select>
+          </label>
         </div>
       </div>
       <button type="submit">Add</button>
@@ -54,18 +64,14 @@
       <tr>
         <td>{{ it.id }}</td>
         <td>{{ it.name }}</td>
-        <td>{{ '%.2f'|format(it.price) }}</td>
+        <td>{{ it.price|vnd }}</td>
         <td>{{ it.category or '-' }}</td>
+        <td>{% if it.available %}Available{% else %}<span class="muted">Hidden</span>{% endif %}</td>
         <td>
-          {% if it.available %}Available{% else %}<span class="muted">Hidden</span>{% endif %}
-        </td>
-        <td>
-          <a href="{{ url_for('admin_menu_edit', item_id=it.id) }}">Edit</a>
-          •
+          <a href="{{ url_for('admin_menu_edit', item_id=it.id) }}">Edit</a> •
           <form class="inline" method="post" action="{{ url_for('admin_menu_toggle', item_id=it.id) }}">
             <button type="submit">{% if it.available %}Hide{% else %}Show{% endif %}</button>
-          </form>
-          •
+          </form> •
           <form class="inline" method="post" action="{{ url_for('admin_menu_delete', item_id=it.id) }}" onsubmit="return confirm('Delete this item?')">
             <button type="submit">Delete</button>
           </form>

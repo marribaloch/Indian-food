@@ -1,72 +1,64 @@
+# db_setup.py
 import sqlite3
 
-DB = "grab.db"
+DB_FILE = "grab.db"
 
-conn = sqlite3.connect(DB)
-cur = conn.cursor()
+def init_db():
+    conn = sqlite3.connect(DB_FILE)
+    cur = conn.cursor()
 
-# --- Create tables (fresh) ---
-cur.execute("""
-CREATE TABLE IF NOT EXISTS restaurants (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL
-)
-""")
+    # Users (role: customer/driver/admin)
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        email TEXT UNIQUE NOT NULL,
+        password_hash TEXT NOT NULL,
+        role TEXT CHECK(role IN ('customer','driver','admin')) NOT NULL DEFAULT 'customer',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
 
-cur.execute("""
-CREATE TABLE IF NOT EXISTS customers (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    phone TEXT UNIQUE
-)
-""")
+    # Menu items
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS menu_items (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        price INTEGER NOT NULL,
+        image_url TEXT,
+        is_active INTEGER DEFAULT 1
+    )
+    """)
 
-# IMPORTANT: customer_id, total, created_at must exist
-cur.execute("""
-CREATE TABLE IF NOT EXISTS orders (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    customer_id INTEGER,
-    total INTEGER DEFAULT 0,
-    created_at TEXT NOT NULL,
-    FOREIGN KEY(customer_id) REFERENCES customers(id)
-)
-""")
+    # Orders
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS orders (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        items_json TEXT NOT NULL,
+        total INTEGER NOT NULL,
+        status TEXT DEFAULT 'NEW',
+        driver_id INTEGER,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(user_id) REFERENCES users(id)
+    )
+    """)
 
-# IMPORTANT: restaurant_id NOT NULL so we will seed with restaurant_id=1
-cur.execute("""
-CREATE TABLE IF NOT EXISTS menu_items (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    price INTEGER NOT NULL,
-    restaurant_id INTEGER NOT NULL,
-    FOREIGN KEY(restaurant_id) REFERENCES restaurants(id)
-)
-""")
+    # Drivers
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS drivers (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER UNIQUE NOT NULL,
+        phone TEXT,
+        vehicle TEXT,
+        is_active INTEGER DEFAULT 1,
+        FOREIGN KEY(user_id) REFERENCES users(id)
+    )
+    """)
 
-# IMPORTANT: price_each column used by app
-cur.execute("""
-CREATE TABLE IF NOT EXISTS order_items (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    order_id INTEGER NOT NULL,
-    menu_item_id INTEGER NOT NULL,
-    qty INTEGER NOT NULL,
-    price_each INTEGER NOT NULL,
-    FOREIGN KEY(order_id) REFERENCES orders(id),
-    FOREIGN KEY(menu_item_id) REFERENCES menu_items(id)
-)
-""")
+    conn.commit()
+    conn.close()
+    print("DB initialized for", DB_FILE)
 
-# --- Seed base rows (if empty) ---
-# restaurant #1
-cur.execute("SELECT COUNT(*) FROM restaurants")
-if cur.fetchone()[0] == 0:
-    cur.execute("INSERT INTO restaurants(name) VALUES (?)", ("Main Restaurant",))
-
-# default customer 'Walk-in'
-cur.execute("SELECT COUNT(*) FROM customers WHERE name='Walk-in'")
-if cur.fetchone()[0] == 0:
-    cur.execute("INSERT INTO customers(name, phone) VALUES ('Walk-in', NULL)")
-
-conn.commit()
-conn.close()
-print("[db_setup] Schema ensured. Ready:", DB)
+if __name__ == "__main__":
+    init_db()

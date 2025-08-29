@@ -2,9 +2,11 @@
 {% block content %}
 <h2>Login</h2>
 <form method="post">
-  <label>Email <input type="email" name="email" required autofocus></label>
-  <label>Password <input type="password" name="password" required></label>
+  <label>Email</label>
+  <input type="email" name="email" required>
+  <label>Password</label>
+  <input type="password" name="password" required>
   <button type="submit">Login</button>
 </form>
-<p>Don’t have an account? <a href="{{ url_for('register') }}">Register</a></p>
+<p>No account? <a href="{{ url_for('register') }}">Register</a></p>
 {% endblock %}

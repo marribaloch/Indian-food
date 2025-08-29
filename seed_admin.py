@@ -1,35 +1,23 @@
+# seed_admin.py
 import sqlite3
 from werkzeug.security import generate_password_hash
 
-EMAIL = "admin@example.com"
-PASSWORD = "admin123"
-NAME = "Admin"
-ROLE = "admin"
+DB_FILE = "grab.db"
 
-con = sqlite3.connect("app.db")
-cur = con.cursor()
+def seed():
+    conn = sqlite3.connect(DB_FILE)
+    cur = conn.cursor()
+    cur.execute("SELECT id FROM users WHERE email=?", ("admin@example.com",))
+    if cur.fetchone():
+        print("Admin already exists.")
+    else:
+        cur.execute(
+            "INSERT INTO users (name,email,password_hash,role) VALUES (?,?,?,?)",
+            ("Admin", "admin@example.com", generate_password_hash("admin123"), "admin")
+        )
+        conn.commit()
+        print("Admin created: admin@example.com / admin123")
+    conn.close()
 
-# ensure users table exists
-cur.execute("""CREATE TABLE IF NOT EXISTS users (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name TEXT NOT NULL,
-  phone TEXT UNIQUE,
-  email TEXT UNIQUE,
-  password_hash TEXT NOT NULL,
-  role TEXT DEFAULT 'customer'
-)""")
-
-# upsert simple
-cur.execute("SELECT id FROM users WHERE email = ?", (EMAIL,))
-row = cur.fetchone()
-if row:
-    cur.execute("UPDATE users SET password_hash=?, name=?, role=? WHERE id=?",
-                (generate_password_hash(PASSWORD), NAME, ROLE, row[0]))
-    print("Updated existing admin:", EMAIL)
-else:
-    cur.execute("INSERT INTO users (name, email, password_hash, role) VALUES (?,?,?,?)",
-                (NAME, EMAIL, generate_password_hash(PASSWORD), ROLE))
-    print("Inserted admin:", EMAIL)
-
-con.commit()
-con.close()
+if __name__ == "__main__":
+    seed()

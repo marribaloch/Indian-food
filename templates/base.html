@@ -1,42 +1,39 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>{{ title or "Grab App" }}</title>
-  <link rel="stylesheet" href="https://unpkg.com/mvp.css">
-  <style>nav a{margin-right:.6rem}.badge{padding:.15rem .45rem;border-radius:.4rem;background:#eee}</style>
+  <meta charset="utf-8">
+  <title>{{ title or "Indian Food App" }}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="{{ url_for('static', filename='style.css') }}" rel="stylesheet">
 </head>
 <body>
-<header>
-  <nav>
-    <a href="{{ url_for('menu') }}">Menu</a>
-    <a href="{{ url_for('driver_home') }}">Driver</a>
-    {% if is_admin %}
-      <a href="{{ url_for('admin') }}">Admin</a>
-      <a href="{{ url_for('admin_menu') }}">Menu Admin</a>
-    {% endif %}
-    <span class="badge">Restaurant: {{ rid if rid else '' }}</span>
-    <span style="float:right">
-      {% if current_user %}
-        Hello, {{ current_user.name }} · <a href="{{ url_for('logout') }}">Logout</a>
+  <header>
+    <h1>Indian Food App</h1>
+    <nav>
+      {% if session.get('user_id') %}
+        <a href="{{ url_for('menu') }}">Menu</a>
+        <a href="{{ url_for('order') }}">Order</a>
+        {% if session.get('user_role') == 'admin' %}
+          <a href="{{ url_for('admin') }}">Admin</a>
+        {% endif %}
+        <a href="{{ url_for('logout') }}">Logout</a>
       {% else %}
-        <a href="{{ url_for('login') }}">Login</a> · <a href="{{ url_for('register') }}">Register</a>
+        <a href="{{ url_for('login') }}">Login</a>
+        <a href="{{ url_for('register') }}">Register</a>
       {% endif %}
-    </span>
-  </nav>
-</header>
+    </nav>
+  </header>
 
-<main>
-  {% with messages = get_flashed_messages(with_categories=true) %}
+  {% with messages = get_flashed_messages() %}
     {% if messages %}
-      <section>
-        {% for cat,msg in messages %}
-          <p class="badge">{{ cat|upper }}: {{ msg }}</p>
-        {% endfor %}
-      </section>
+      <ul class="flash">
+        {% for m in messages %}<li>{{ m }}</li>{% endfor %}
+      </ul>
     {% endif %}
   {% endwith %}
-  {% block content %}{% endblock %}
-</main>
+
+  <main>
+    {% block content %}{% endblock %}
+  </main>
 </body>
 </html>

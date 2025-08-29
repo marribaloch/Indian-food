@@ -1,26 +1,7 @@
-/* --- Layout helpers --- */
-.container { max-width: 1100px; margin: 24px auto; padding: 0 16px; }
-.appbar { background:#222; color:#fff; padding:14px 16px; display:flex; align-items:center; gap:16px; }
-.appbar h1 { margin:0; font-size:20px; }
-.appbar h1 a { color:#fff; text-decoration:none; }
-.appbar nav a { color:#ddd; margin-right:14px; text-decoration:none; }
-.appbar nav a:hover { color:#fff; text-decoration:underline; }
-
-.card { background:#fff; border:1px solid #e4e4e4; border-radius:8px; padding:16px; margin-bottom:16px; }
-.row { display:flex; gap:12px; align-items:center; }
-.row.wrap { flex-wrap:wrap; }
-.row.end { justify-content:flex-end; }
-.grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
-@media (max-width: 720px){ .grid-2 { grid-template-columns:1fr; } }
-
-input, select, button { padding:10px 12px; border:1px solid #ccc; border-radius:6px; font:inherit; }
-button.primary, button { background:#0d6efd; color:#fff; border:none; cursor:pointer; }
-button:hover { filter:brightness(0.95); }
-
-.table { width:100%; border-collapse:collapse; background:#fff; }
-.table th, .table td { border:1px solid #e5e5e5; padding:10px; text-align:left; }
-.table thead th { background:#f7f7f7; }
-.table tfoot td { background:#fafafa; }
-.right { text-align:right; }
-.muted { color:#777; }
-.alert.success { background:#e9f7ef; border:1px solid #c8ebd6; padding:10px 12px; border-radius:6px; margin:12px 0; }
+body { font-family: system-ui, Arial, sans-serif; margin: 0 auto; max-width: 800px; padding: 16px; }
+header { display: flex; justify-content: space-between; align-items: center; }
+nav a { margin-right: 12px; text-decoration: none; }
+label { display:block; margin-top:10px; }
+input, select { width: 100%; padding:8px; margin-top:4px; }
+button { margin-top:12px; padding:10px 14px; cursor:pointer; }
+.flash { background:#fff8c5; padding:10px; border:1px solid #ffe58f; }
