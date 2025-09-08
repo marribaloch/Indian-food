@@ -53,6 +53,21 @@ def inject_csrf():
 
 limiter = Limiter(get_remote_address, app=app, default_limits=["200 per day", "50 per hour"])
 
+# >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+# NEW: Ensure DB is initialized even under gunicorn (Render deploy)
+try:
+    with app.app_context():
+        # Safe to call repeatedly; our SQL uses IF NOT EXISTS / guarded alters
+        def _noop():  # tiny guard if init_db not yet defined by import order
+            pass
+        init_db if 'init_db' in globals() else _noop
+except Exception as _e:
+    try:
+        app.logger.exception("init_db on import failed: %s", _e)
+    except Exception:
+        pass
+# <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
 ALLOWED_ORIGINS = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "").split(",") if o.strip()]
 if not ALLOWED_ORIGINS:
     ALLOWED_ORIGINS = ["http://localhost:3000", "http://127.0.0.1:3000"]
@@ -224,6 +239,7 @@ def init_db():
     """)
 
     db.commit()
+
 @app.route("/plain")
 def plain():
     return "<!doctype html><title>Plain</title><h1>Plain OK</h1>"
