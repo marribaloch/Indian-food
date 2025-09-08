@@ -1,0 +1,71 @@
+{% extends "layout.html" %}
+{% block title %}Sections · Admin{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h3 class="mb-0">Sections / Categories</h3>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('admin') }}" class="btn btn-outline-secondary btn-sm">← Back to Admin</a>
+    <a href="{{ url_for('admin_sections_new') }}" class="btn btn-primary btn-sm">+ New Section</a>
+  </div>
+</div>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    {% for c,m in messages %}
+      <div class="alert alert-{{ c }} mb-3">{{ m }}</div>
+    {% endfor %}
+  {% endif %}
+{% endwith %}
+
+{% if rows and rows|length %}
+<div class="table-responsive">
+  <table class="table align-middle">
+    <thead class="table-light">
+      <tr>
+        <th style="width: 80px;">ID</th>
+        <th>Name</th>
+        <th style="width: 140px;">Sort</th>
+        <th style="width: 120px;">Status</th>
+        <th style="width: 220px;">Created</th>
+        <th class="text-end" style="width: 160px;">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in rows %}
+      <tr>
+        <td>#{{ r.id }}</td>
+        <td>
+          <div class="fw-semibold">{{ r.name }}</div>
+          {% if r.description %}
+            <div class="text-muted small">{{ r.description }}</div>
+          {% endif %}
+        </td>
+        <td>{{ r.sort_order or 0 }}</td>
+        <td>
+          {% if r.is_active %}
+            <span class="badge bg-success">Active</span>
+          {% else %}
+            <span class="badge bg-secondary">Inactive</span>
+          {% endif %}
+        </td>
+        <td><small class="text-muted">{{ r.created_at }}</small></td>
+        <td class="text-end">
+          <div class="d-inline-flex gap-2">
+            <a href="{{ url_for('admin_sections_edit', section_id=r.id) }}" class="btn btn-sm btn-outline-primary">Edit</a>
+            <form method="post" action="{{ url_for('admin_sections_delete', section_id=r.id) }}"
+                  onsubmit="return confirm('Delete section #{{ r.id }} ({{ r.name }})?');">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-sm btn-outline-danger">Delete</button>
+            </form>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+  <div class="alert alert-info">No sections yet. Click <b>+ New Section</b> to add your first one.</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>{% block title %}Indian Food App{% endblock %}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Bootstrap CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+
+  <!-- Navbar -->
+  <nav class="navbar navbar-expand-lg bg-white border-bottom">
+    <div class="container">
+      <a class="navbar-brand" href="{{ url_for('menu') }}">Indian Food App</a>
+      <div class="ms-auto d-flex gap-2">
+        <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('menu') }}">Menu</a>
+        {% if session.get('user_id') %}
+          <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('my_orders') }}">My Orders</a>
+          <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('change_password') }}">Change Password</a>
+          {% if session.get('is_admin') %}
+            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('admin') }}">Admin</a>
+          {% endif %}
+          <a class="btn btn-sm btn-outline-danger" href="{{ url_for('logout') }}">Logout</a>
+        {% else %}
+          <a class="btn btn-sm btn-primary" href="{{ url_for('login') }}">Login</a>
+        {% endif %}
+      </div>
+    </div>
+  </nav>
+
+  <!-- Flashes -->
+  <div class="container mt-3">
+    {% with msgs = get_flashed_messages(with_categories=True) %}
+      {% if msgs %}
+        {% for cat, msg in msgs %}
+          <div class="alert alert-{{cat}} py-2 mb-2">{{ msg }}</div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+  </div>
+
+  <!-- Page content -->
+  <div class="container py-3">
+    {% block content %}{% endblock %}
+  </div>
+
+  <!-- Footer -->
+  <footer class="text-center text-muted py-3 mt-4 border-top">
+    &copy; 2025 Indian Food App — All rights reserved.
+  </footer>
+
+  <!-- Bootstrap JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

@@ -1,33 +1,69 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Admin - All Orders</title>
-</head>
-<body>
-    <h1>All Orders (Admin View)</h1>
+{% extends "layout.html" %}
+{% block title %}Manage Orders · Indian Food App{% endblock %}
+{% block content %}
 
-    {% if orders %}
-        <table border="1">
-            <tr>
-                <th>Customer Name</th>
-                <th>Item</th>
-                <th>Quantity</th>
-                <th>Time</th>
-            </tr>
-            {% for order in orders %}
-            <tr>
-                <td>{{ order.name }}</td>
-                <td>{{ order.item }}</td>
-                <td>{{ order.quantity }}</td>
-                <td>{{ order.timestamp }}</td>
-            </tr>
-            {% endfor %}
-        </table>
+<h2 class="mb-3">Manage Orders</h2>
+
+<div class="d-flex gap-2 mb-3">
+  <a class="btn btn-outline-secondary {% if not active_status %}active{% endif %}" href="{{ url_for('admin_orders') }}">All</a>
+  {% for s in ['pending','preparing','ready','delivered','cancelled'] %}
+    <a class="btn btn-outline-secondary {% if active_status==s %}active{% endif %}" href="{{ url_for('admin_orders', status=s) }}">{{ s|capitalize }}</a>
+  {% endfor %}
+  <a class="btn btn-outline-dark ms-auto" href="{{ url_for('admin') }}">Back to Dashboard</a>
+</div>
+
+<div class="table-responsive">
+  <table class="table table-sm align-middle">
+    <thead>
+      <tr>
+        <th style="width:80px;">ID</th>
+        <th style="width:120px;">Total</th>
+        <th style="width:140px;">Status</th>
+        <th>Placed At</th>
+        <th class="text-end" style="width:420px;">Update</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for o in orders %}
+      <tr>
+        <td>#{{ o.id }}</td>
+        <td>{{ o.total|vnd }}</td>
+        <td>
+          {% set color =
+              'secondary' if o.status == 'pending' else
+              'primary'   if o.status == 'preparing' else
+              'warning'   if o.status == 'ready' else
+              'success'   if o.status == 'delivered' else
+              'danger'    if o.status == 'cancelled' else 'secondary' %}
+          <span class="badge bg-{{ color }} text-uppercase">{{ o.status }}</span>
+        </td>
+        <td>{{ o.created_at }}</td>
+        <td class="text-end">
+          <div class="btn-group" role="group">
+            <form method="post" action="{{ url_for('admin_order_status', order_id=o.id) }}">
+              <input type="hidden" name="status" value="preparing">
+              <button class="btn btn-outline-primary btn-sm">Preparing</button>
+            </form>
+            <form method="post" action="{{ url_for('admin_order_status', order_id=o.id) }}">
+              <input type="hidden" name="status" value="ready">
+              <button class="btn btn-outline-warning btn-sm">Ready</button>
+            </form>
+            <form method="post" action="{{ url_for('admin_order_status', order_id=o.id) }}">
+              <input type="hidden" name="status" value="delivered">
+              <button class="btn btn-outline-success btn-sm">Delivered</button>
+            </form>
+            <form method="post" action="{{ url_for('admin_order_status', order_id=o.id) }}">
+              <input type="hidden" name="status" value="cancelled">
+              <button class="btn btn-outline-danger btn-sm">Cancel</button>
+            </form>
+          </div>
+        </td>
+      </tr>
     {% else %}
-        <p>No orders yet.</p>
-    {% endif %}
+      <tr><td colspan="5" class="text-muted">No orders.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
 
-    <br>
-    <a href="/">Back to Menu</a>
-</body>
-</html>
+{% endblock %}

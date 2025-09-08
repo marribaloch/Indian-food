@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Order #{{ order.id }} • {{ order.status }}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body{font-family:Arial,Helvetica,sans-serif;margin:0;background:#faf7f5}
+    .wrap{max-width:760px;margin:24px auto;background:#fff;border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,.06);overflow:hidden}
+    .hdr{background:#7b0f19;color:#fff;padding:16px 20px;display:flex;align-items:center;gap:10px}
+    .hdr .title{font-size:20px;font-weight:800}
+    .pill{margin-left:auto;background:#0e8243;color:#fff;padding:6px 12px;border-radius:16px;font-weight:700;font-size:13px;text-transform:capitalize}
+    .pill.pending{background:#b08900}
+    .pill.preparing{background:#0d6efd}
+    .pill.on_the_way{background:#0e8243}
+    .pill.delivered{background:#198754}
+    .pill.cancelled{background:#6c757d}
+    .body{padding:18px 20px}
+    h1{margin:0 0 8px;font-size:22px;color:#222}
+    p{margin:6px 0;color:#444}
+    .meta{margin:12px 0 16px;font-size:14px}
+    .meta b{color:#111}
+    table{width:100%;border-collapse:collapse;margin:10px 0 0}
+    th,td{padding:10px 0;border-bottom:1px solid #eee}
+    th{text-align:left;color:#666;font-size:13px}
+    td{font-size:15px}
+    td.right{text-align:right}
+    .total-row td{font-weight:700;color:#7b0f19}
+    .small{font-size:12px;color:#777}
+    .footer{padding:14px 20px 18px;background:#fff}
+    .btn{display:inline-block;background:#d78220;color:#fff;text-decoration:none;padding:10px 16px;border-radius:10px;font-weight:700}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="hdr">
+      <div class="title">Indian Food App</div>
+      <div id="statusPill" class="pill {{ order.status|lower }}">{{ order.status }}</div>
+    </div>
+
+    <div class="body">
+      <h1>Order #{{ order.id }}</h1>
+      <p class="meta">
+        <b>Name:</b> {{ order.customer_name or 'Customer' }} &nbsp;•&nbsp;
+        <b>Phone:</b> {{ order.phone }} &nbsp;•&nbsp;
+        <b>Placed:</b> {{ order.created_at }}
+      </p>
+
+      <table role="presentation">
+        <thead>
+          <tr><th>Item</th><th class="right">Qty</th><th class="right">Price</th></tr>
+        </thead>
+        <tbody>
+          {% for li in items %}
+          <tr>
+            <td>{{ li.name }}</td>
+            <td class="right">{{ li.quantity }}</td>
+            <td class="right">{{ li.price|vnd }}</td>
+          </tr>
+          {% endfor %}
+          <tr class="total-row">
+            <td class="right" colspan="2">Total</td>
+            <td class="right">{{ order.total|vnd }}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p class="meta"><b>Delivery:</b> {{ order.address }}</p>
+      <p class="small">Status update dekhne ke liye page ko manually refresh (Ctrl+R/Ctrl+F5) karein.</p>
+    </div>
+
+    <div class="footer">
+      <a class="btn" href="/">Back to menu</a>
+    </div>
+  </div>
+</body>
+</html>

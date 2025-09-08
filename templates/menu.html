@@ -1,36 +1,100 @@
-<!doctype html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>Indian Food App • Menu</title>
-  <style>
-    body{font-family:system-ui,Arial;margin:40px}
-    .muted{color:#888}
-    table{border-collapse:collapse;width:100%;margin-top:12px}
-    th,td{border:1px solid #ddd;padding:8px}
-    th{background:#f5f5f5;text-align:left}
-    a{color:#333;text-decoration:none}
-    a:hover{text-decoration:underline}
-  </style>
-</head>
-<body>
-  <div style="float:right"><a href="{{ url_for('admin_menu') }}">Admin</a></div>
-  <h1>Indian Food App</h1>
-  <h2>Menu</h2>
+{% extends "layout.html" %}
+{% block title %}Menu · Indian Food App{% endblock %}
 
-  {% if items and items|length %}
-    <table>
-      <tr><th>Name</th><th>Category</th><th>Price</th></tr>
-      {% for it in items %}
-        <tr>
-          <td>{{ it.name }}</td>
-          <td>{{ it.category or '-' }}</td>
-          <td>{{ it.price|vnd }}</td>
-        </tr>
-      {% endfor %}
-    </table>
-  {% else %}
-    <p class="muted">No items yet. (Ask Admin to add some.)</p>
-  {% endif %}
-</body>
-</html>
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h2 class="mb-0">Menu</h2>
+  <div class="d-flex gap-2">
+    {% if session.get('user_id') %}
+      <a href="{{ url_for('change_password') }}" class="btn btn-outline-secondary btn-sm">Change Password</a>
+      <a href="{{ url_for('my_orders') }}" class="btn btn-outline-secondary btn-sm">My Orders</a>
+      {% if session.get('is_admin') %}
+        <a href="{{ url_for('admin') }}" class="btn btn-outline-primary btn-sm">Admin</a>
+        <a href="{{ url_for('admin_sections') }}" class="btn btn-outline-primary btn-sm">Sections</a>
+      {% endif %}
+      <a href="{{ url_for('logout') }}" class="btn btn-outline-danger btn-sm">Logout</a>
+    {% else %}
+      <a href="{{ url_for('login') }}" class="btn btn-primary btn-sm">Login</a>
+    {% endif %}
+  </div>
+</div>
+
+{# -------- Sections with items -------- #}
+{% if sections and sections|length %}
+  {% for sec in sections %}
+    {% set items = items_by_section.get(sec.id) or [] %}
+    {% if items and items|length %}
+      <div class="mb-2 d-flex align-items-center justify-content-between">
+        <h4 class="mb-0">{{ sec.name }}</h4>
+        {% if sec.description %}<small class="text-muted">{{ sec.description }}</small>{% endif %}
+      </div>
+
+      <div class="row g-3 mb-4">
+        {% for it in items %}
+          <div class="col-md-4">
+            <div class="card h-100">
+
+              {% if it.image_url %}
+                <img
+                  src="{{ it.image_url }}"
+                  class="card-img-top item-img"
+                  alt="{{ it.name }}"
+                  loading="lazy"
+                  referrerpolicy="no-referrer"
+                  onerror="this.onerror=null;this.src='{{ url_for('static', filename='images/placeholder.png') }}'">
+              {% else %}
+                <img
+                  src="{{ url_for('static', filename='images/placeholder.png') }}"
+                  class="card-img-top item-img"
+                  alt="{{ it.name }}">
+              {% endif %}
+
+              <div class="card-body">
+                <h5 class="card-title">{{ it.name }}</h5>
+                {% if it.description %}<p class="card-text text-muted">{{ it.description }}</p>{% endif %}
+                <div class="fw-bold">{{ (it.price or 0) | vnd }}</div>
+              </div>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endfor %}
+{% endif %}
+
+{# -------- Uncategorized items -------- #}
+{% if uncategorized and uncategorized|length %}
+  <div class="mb-2"><h4 class="mb-0">Other Items</h4></div>
+  <div class="row g-3">
+    {% for it in uncategorized %}
+      <div class="col-md-4">
+        <div class="card h-100">
+
+          {% if it.image_url %}
+            <img
+              src="{{ it.image_url }}"
+              class="card-img-top item-img"
+              alt="{{ it.name }}"
+              loading="lazy"
+              referrerpolicy="no-referrer"
+              onerror="this.onerror=null;this.src='{{ url_for('static', filename='images/placeholder.png') }}'">
+          {% else %}
+            <img
+              src="{{ url_for('static', filename='images/placeholder.png') }}"
+              class="card-img-top item-img"
+              alt="{{ it.name }}">
+          {% endif %}
+
+          <div class="card-body">
+            <h5 class="card-title">{{ it.name }}</h5>
+            {% if it.description %}<p class="card-text text-muted">{{ it.description }}</p>{% endif %}
+            <div class="fw-bold">{{ (it.price or 0) | vnd }}</div>
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+{% elif not sections or sections|length == 0 %}
+  <p class="text-muted">No items yet.</p>
+{% endif %}
+{% endblock %}

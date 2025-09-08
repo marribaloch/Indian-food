@@ -1,66 +1,30 @@
-<!doctype html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>Admin Menu</title>
-  <style>
-    body{font-family:system-ui,Segoe UI,Arial;margin:24px}
-    table{border-collapse:collapse;width:100%}
-    th,td{border:1px solid #ddd;padding:8px;text-align:left}
-    th{background:#f5f5f5}
-    .actions{display:flex;gap:8px}
-    form{display:inline}
-    button{cursor:pointer}
-  </style>
-</head>
-<body>
-  <h1>Admin Menu</h1>
+{% extends "layout.html" %}
+{% block content %}
+<h2>Menu Management</h2>
+<p><a class="button" href="{{ url_for('new_item') }}">+ New Item</a></p>
 
-  {% with msgs = get_flashed_messages(with_categories=false) %}
-    {% if msgs %}
-      <ul>
-        {% for m in msgs %}<li>{{ m }}</li>{% endfor %}
-      </ul>
-    {% endif %}
-  {% endwith %}
-
-  <table>
+<table class="table">
+  <thead>
+    <tr><th>ID</th><th>Name</th><th>Price</th><th>Cat</th><th>Avail</th><th>Actions</th></tr>
+  </thead>
+  <tbody>
+    {% for it in items %}
     <tr>
-      <th>ID</th><th>Name</th><th>Price</th><th>Avail</th><th>Actions</th>
-    </tr>
-    {% for item in items %}
-    <tr>
-      <td>{{ item['id'] }}</td>
-      <td>{{ item['name'] }}</td>
-      <td>{{ item['price']|vnd }}</td>
+      <td>{{ it.id }}</td>
+      <td>{{ it.name }}</td>
+      <td>{{ it.price|vnd }}</td>
+      <td>{{ it.category or '-' }}</td>
+      <td>{{ 'Yes' if it.available else 'No' }}</td>
       <td>
-        {% if 'available' in item.keys() %}
-          {{  'Yes' if item['available'] else 'No' }}
-        {% else %}
-          —
-        {% endif %}
-      </td>
-      <td class="actions">
-        <!-- Edit -->
-        <a href="{{ url_for('admin_menu_edit', item_id=item['id']) }}">
-          Edit
-        </a>
-
-        <!-- Toggle (POST) -->
-        <form method="post" action="{{ url_for('admin_menu_toggle', item_id=item['id']) }}">
-          <button type="submit">Toggle</button>
-        </form>
-
-        <!-- Delete (POST) -->
-        <form method="post" action="{{ url_for('admin_menu_delete', item_id=item['id']) }}"
-              onsubmit="return confirm('Delete this item?');">
-          <button type="submit">Delete</button>
+        <a href="{{ url_for('edit_item', item_id=it.id) }}">Edit</a>
+        <form method="post" action="{{ url_for('delete_item', item_id=it.id) }}" style="display:inline;" onsubmit="return confirm('Delete this item?')">
+          <button type="submit" class="linklike danger">Delete</button>
         </form>
       </td>
     </tr>
+    {% else %}
+    <tr><td colspan="6">No items.</td></tr>
     {% endfor %}
-  </table>
-
-  <p style="margin-top:16px"><a href="{{ url_for('menu') }}">⬅ Back to public menu</a></p>
-</body>
-</html>
+  </tbody>
+</table>
+{% endblock %}

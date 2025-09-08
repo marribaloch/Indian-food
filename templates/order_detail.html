@@ -1,0 +1,55 @@
+{% extends "layout.html" %}
+<td class="text-end">{{ sub | vnd }}</td>
+</tr>
+{% else %}
+<tr><td colspan="5" class="text-center text-secondary py-4">No items.</td></tr>
+{% endfor %}
+</tbody>
+<tfoot class="table-light">
+<tr>
+<th colspan="4" class="text-end">Total</th>
+<th class="text-end">{{ (order.total or grand) | vnd }}</th>
+</tr>
+</tfoot>
+</table>
+</div>
+</div>
+</div>
+
+
+<div class="col-12 col-lg-4">
+<div class="card shadow-sm h-100">
+<div class="card-header"><strong>Customer</strong></div>
+<div class="card-body">
+<div class="mb-2"><span class="text-secondary small">Name</span><div class="fw-medium">{{ order.customer_name or order.name or '—' }}</div></div>
+<div class="mb-2"><span class="text-secondary small">Phone</span><div class="fw-medium">{{ order.phone or '—' }}</div></div>
+<div class="mb-2"><span class="text-secondary small">Address</span><div class="fw-medium">{{ order.address or '—' }}</div></div>
+<div class="mb-2"><span class="text-secondary small">Created</span><div class="fw-medium">{{ order.created_at }}</div></div>
+<div class="mb-2"><span class="text-secondary small">Status</span><div>
+<span class="badge text-bg-{{ 'warning' if order.status=='pending' else 'info' if order.status=='preparing' else 'primary' if order.status=='on_the_way' else 'success' if order.status=='delivered' else 'secondary' }}">{{ order.status|capitalize }}</span>
+</div></div>
+
+
+{% if session.get('is_admin') %}
+<hr>
+<form class="d-grid gap-2" method="post" action="{{ url_for('admin_update_order_status', order_id=order.id) }}">
+<div class="form-floating">
+<select class="form-select" id="status" name="status" required>
+{% set s = (order.status or 'pending') %}
+<option value="pending" {{ 'selected' if s=='pending' else '' }}>Pending</option>
+<option value="preparing" {{ 'selected' if s=='preparing' else '' }}>Preparing</option>
+<option value="on_the_way" {{ 'selected' if s=='on_the_way' else '' }}>On the way</option>
+<option value="delivered" {{ 'selected' if s=='delivered' else '' }}>Delivered</option>
+<option value="cancelled" {{ 'selected' if s=='cancelled' else '' }}>Cancelled</option>
+</select>
+<label for="status">Update Status</label>
+</div>
+<button type="submit" class="btn btn-primary">Save</button>
+</form>
+{% endif %}
+</div>
+</div>
+</div>
+</div>
+</div>
+{% endblock %}

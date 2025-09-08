@@ -1,9 +1,66 @@
-{% extends "base.html" %}
-{% block content %}
-<h2>Admin Dashboard</h2>
-<ul>
-  <li><a href="{{ url_for('admin_menu') }}">Manage Menu Items</a></li>
-  <li>Orders overview (coming soon)</li>
-  <li>Driver assignment (coming soon)</li>
-</ul>
+{% extends "layout.html" %}
+<div>
+<div class="text-secondary small">Delivered</div>
+<div class="fs-4 fw-bold">{{ stats.delivered or 0 }}</div>
+</div>
+<i class="bi bi-check2-circle fs-1 text-muted"></i>
+</div>
+</div>
+</div>
+</div>
+<div class="col-12 col-md-6 col-xl-3">
+<div class="card shadow-sm h-100">
+<div class="card-body">
+<div class="d-flex justify-content-between align-items-center">
+<div>
+<div class="text-secondary small">Revenue (VND)</div>
+<div class="fs-4 fw-bold">{{ (stats.revenue or 0) | vnd }}</div>
+</div>
+<i class="bi bi-cash-coin fs-1 text-muted"></i>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+
+<div class="card shadow-sm">
+<div class="card-header d-flex align-items-center justify-content-between">
+<strong>Recent Orders</strong>
+<a href="{{ url_for('admin_orders') }}" class="btn btn-sm btn-outline-primary">View all</a>
+</div>
+<div class="table-responsive">
+<table class="table table-hover align-middle mb-0">
+<thead class="table-light">
+<tr>
+<th>ID</th>
+<th>Customer</th>
+<th>Total</th>
+<th>Status</th>
+<th>Placed</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+{% for o in recent_orders or [] %}
+<tr>
+<td>#{{ o.id }}</td>
+<td>{{ o.customer_name or o.name or '—' }}</td>
+<td>{{ (o.total or 0) | vnd }}</td>
+<td>
+<span class="badge text-bg-{{ 'warning' if o.status=='pending' else 'info' if o.status=='preparing' else 'primary' if o.status=='on_the_way' else 'success' if o.status=='delivered' else 'secondary' }}">{{ o.status|capitalize }}</span>
+</td>
+<td>{{ o.created_at }}</td>
+<td>
+<a class="btn btn-sm btn-outline-secondary" href="{{ url_for('order_detail', order_id=o.id) }}">Details</a>
+</td>
+</tr>
+{% else %}
+<tr><td colspan="6" class="text-center text-secondary py-4">No recent orders.</td></tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+</div>
+</div>
 {% endblock %}

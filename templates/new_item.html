@@ -1,0 +1,24 @@
+{% extends "layout.html" %}
+{% block content %}
+<h2>New Menu Item</h2>
+<form method="post" class="card" enctype="multipart/form-data">
+  <label>Name</label>
+  <input type="text" name="name" required />
+  <label>Description</label>
+  <textarea name="description" rows="3"></textarea>
+  <div class="grid2">
+    <div>
+      <label>Price (VND)</label>
+      <input type="number" step="0.01" name="price" required />
+    </div>
+    <div>
+      <label>Category</label>
+      <input type="text" name="category" />
+    </div>
+  </div>
+  <label><input type="checkbox" name="available" checked /> Available</label>
+  <label>Photo (jpg/png/webp)</label>
+  <input type="file" name="image" accept=".jpg,.jpeg,.png,.gif,.webp" />
+  <button type="submit">Create</button>
+</form>
+{% endblock %}

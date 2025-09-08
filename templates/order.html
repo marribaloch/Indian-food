@@ -1,5 +1,61 @@
-{% extends "base.html" %}
+{% extends "layout.html" %}
+{% block title %}My Orders · Indian Food App{% endblock %}
+
+
 {% block content %}
-<h2>Order</h2>
-<p>Order flow will be wired next after Admin Menu CRUD.</p>
+<div class="container py-3">
+<div class="d-flex align-items-center justify-content-between mb-3">
+<h2 class="mb-0">My Orders</h2>
+<a href="{{ url_for('menu') }}" class="btn btn-outline-secondary btn-sm">Back to Menu</a>
+</div>
+
+
+{# Flash messages #}
+{% with messages = get_flashed_messages(with_categories=true) %}
+{% if messages %}
+<div class="mb-3">
+{% for category, message in messages %}
+<div class="alert alert-{{ 'warning' if category == 'message' else category }} alert-dismissible fade show" role="alert">
+{{ message }}
+<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+</div>
+{% endfor %}
+</div>
+{% endif %}
+{% endwith %}
+
+
+<div class="card shadow-sm">
+<div class="table-responsive">
+<table class="table table-hover align-middle mb-0">
+<thead class="table-light">
+<tr>
+<th>ID</th>
+<th>Total</th>
+<th>Status</th>
+<th>Placed</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+{% for o in orders or [] %}
+<tr>
+<td>#{{ o.id }}</td>
+<td>{{ (o.total or 0) | vnd }}</td>
+<td>
+<span class="badge text-bg-{{ 'warning' if o.status=='pending' else 'info' if o.status=='preparing' else 'primary' if o.status=='on_the_way' else 'success' if o.status=='delivered' else 'secondary' }}">{{ o.status|capitalize }}</span>
+</td>
+<td>{{ o.created_at }}</td>
+<td>
+<a href="{{ url_for('order_detail', order_id=o.id) }}" class="btn btn-sm btn-outline-primary">View</a>
+</td>
+</tr>
+{% else %}
+<tr><td colspan="5" class="text-center text-secondary py-4">You have no orders yet.</td></tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+</div>
+</div>
 {% endblock %}
