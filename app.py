@@ -19,25 +19,23 @@ try:
     load_dotenv()
 except Exception:
     pass
-@app.before_first_request
-def startup_init():
-    try:
-        init_db()
-    except Exception as e:
-        print("DB init failed:", e)
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 DB_NAME  = os.environ.get("DB_NAME", "app.db")
 DATA_DIR = os.environ.get("DATA_DIR", "/var/data")
 
 if DATA_DIR:
-    try: os.makedirs(DATA_DIR, exist_ok=True)
-    except Exception: pass
+    try:
+        os.makedirs(DATA_DIR, exist_ok=True)
+    except Exception:
+        pass
     DB_PATH = os.path.join(DATA_DIR, DB_NAME)
     legacy_db = os.path.join(BASE_DIR, DB_NAME)
     if (not os.path.exists(DB_PATH)) and os.path.exists(legacy_db):
-        try: shutil.copy2(legacy_db, DB_PATH)
-        except Exception: pass
+        try:
+            shutil.copy2(legacy_db, DB_PATH)
+        except Exception:
+            pass
 else:
     DB_PATH = os.path.join(BASE_DIR, DB_NAME)
 
@@ -48,7 +46,7 @@ app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE="Lax",
     SESSION_COOKIE_SECURE=True,
-    WTF_CSRF_TIME_LIMIT=None
+    WTF_CSRF_TIME_LIMIT=None,
 )
 
 csrf = CSRFProtect(app)
@@ -58,21 +56,6 @@ def inject_csrf():
     return dict(csrf_token=generate_csrf)
 
 limiter = Limiter(get_remote_address, app=app, default_limits=["200 per day", "50 per hour"])
-
-# >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-# NEW: Ensure DB is initialized even under gunicorn (Render deploy)
-try:
-    with app.app_context():
-        # Safe to call repeatedly; our SQL uses IF NOT EXISTS / guarded alters
-        def _noop():  # tiny guard if init_db not yet defined by import order
-            pass
-        init_db if 'init_db' in globals() else _noop
-except Exception as _e:
-    try:
-        app.logger.exception("init_db on import failed: %s", _e)
-    except Exception:
-        pass
-# <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
 ALLOWED_ORIGINS = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "").split(",") if o.strip()]
 if not ALLOWED_ORIGINS:
@@ -124,11 +107,13 @@ def get_db():
 @app.teardown_appcontext
 def close_db(_exc):
     db = g.pop("db", None)
-    if db: db.close()
+    if db:
+        db.close()
 
 def _safe_alter(db, sql):
     try:
-        db.execute(sql); db.commit()
+        db.execute(sql)
+        db.commit()
     except Exception:
         pass
 
@@ -203,7 +188,7 @@ def init_db():
     if (cur["c"] or 0) == 0:
         db.execute(
             "INSERT INTO users (name, email, password_hash, is_admin) VALUES (?,?,?,1);",
-            ("Admin", ADMIN_EMAIL_DEFAULT, generate_password_hash("admin123"))
+            ("Admin", ADMIN_EMAIL_DEFAULT, generate_password_hash("admin123")),
         )
         db.commit()
 
@@ -245,6 +230,17 @@ def init_db():
     """)
 
     db.commit()
+
+# ---- DB init should happen AFTER app is created (Render & local both)
+@app.before_first_request
+def startup_init():
+    try:
+        init_db()
+    except Exception as e:
+        try:
+            app.logger.warning("DB init failed: %s", e)
+        except Exception:
+            print("DB init failed:", e)
 
 @app.route("/plain")
 def plain():
@@ -292,9 +288,12 @@ def _get_page_per_page(default_per_page=50, max_per_page=100):
 
 # ----------------------------- Jinja Utils
 def format_vnd(value):
-    try: n = float(value)
-    except Exception: return value
+    try:
+        n = float(value)
+    except Exception:
+        return value
     return f"{int(round(n)):,} VND"
+
 app.jinja_env.filters["vnd"] = format_vnd
 app.jinja_env.globals["loads"] = json.loads
 
@@ -325,7 +324,7 @@ def send_email_safe(to_addr, subject, body_html_or_text, text_fallback: str | No
     except Exception as e:
         return False, f"{type(e).__name__}: {e}"
 
-# ----------------------------- Delivery helpers (unchanged core)
+# ----------------------------- Delivery helpers
 def haversine_km(lat1, lng1, lat2, lng2):
     try:
         R = 6371.0
@@ -344,7 +343,7 @@ def google_drive_time_distance(lat_o, lng_o, lat_d, lng_d, api_key):
             "destinations": f"{lat_d},{lng_d}",
             "key": api_key,
             "departure_time": "now",
-            "mode": "driving"
+            "mode": "driving",
         }
         url = "https://maps.googleapis.com/maps/api/distancematrix/json?" + urllib.parse.urlencode(params)
         with urllib.request.urlopen(url, timeout=8) as resp:
@@ -359,8 +358,10 @@ def google_drive_time_distance(lat_o, lng_o, lat_d, lng_d, api_key):
 def time_of_day_multiplier(now=None):
     now = now or datetime.datetime.now()
     hr = now.hour
-    if 7 <= hr <= 9 or 16 <= hr <= 19: return 1.3
-    if 11 <= hr <= 13: return 1.15
+    if 7 <= hr <= 9 or 16 <= hr <= 19:
+        return 1.3
+    if 11 <= hr <= 13:
+        return 1.15
     return 1.0
 
 def compute_dynamic_delivery_fee(pu_lat, pu_lng, do_lat, do_lng):
@@ -377,8 +378,10 @@ def compute_dynamic_delivery_fee(pu_lat, pu_lng, do_lat, do_lng):
         dist_km = haversine_km(pu_lat, pu_lng, do_lat, do_lng)
         dur_min = (dist_km * 3.0) * time_of_day_multiplier()
     fee = base + (per_km * max(dist_km, 0)) + (per_min * max(dur_min, 0))
-    if min_fee > 0: fee = max(fee, min_fee)
-    if max_fee > 0: fee = min(fee, max_fee)
+    if min_fee > 0:
+        fee = max(fee, min_fee)
+    if max_fee > 0:
+        fee = min(fee, max_fee)
     return round(fee)
 
 # ----------------------------- Safe Home + Health
@@ -422,13 +425,11 @@ def logout():
 @app.route("/menu", methods=["GET"])
 def menu():
     db = get_db()
-    # Active sections ordered
     sections = db.execute("""
         SELECT * FROM sections
         WHERE is_active = 1
         ORDER BY sort_order DESC, id DESC;
     """).fetchall()
-    # Items grouped by section_id
     rows = db.execute("""
         SELECT * FROM menu_items
         WHERE is_active = 1
@@ -444,10 +445,12 @@ def menu():
         else:
             uncategorized.append(r)
 
-    return render_template("menu.html",
-                           sections=sections,
-                           items_by_section=items_by_section,
-                           uncategorized=uncategorized)
+    return render_template(
+        "menu.html",
+        sections=sections,
+        items_by_section=items_by_section,
+        uncategorized=uncategorized,
+    )
 
 @csrf.exempt
 @app.route("/order", methods=["GET", "POST"])
@@ -540,8 +543,10 @@ def my_orders():
 
     orders = []
     for r in rows:
-        try: items = json.loads(r["items_json"]) if r["items_json"] else []
-        except Exception: items = []
+        try:
+            items = json.loads(r["items_json"]) if r["items_json"] else []
+        except Exception:
+            items = []
         items_total = float(r["items_total"] or 0)
         if (items_total == 0) and items:
             items_total = sum(float(i.get("price",0))*float(i.get("qty",1)) for i in items)
@@ -578,8 +583,10 @@ def order_detail(order_id):
         flash("You cannot view this order.", "danger")
         return redirect(url_for("my_orders"))
 
-    try: items = json.loads(row["items_json"]) if row["items_json"] else []
-    except Exception: items = []
+    try:
+        items = json.loads(row["items_json"]) if row["items_json"] else []
+    except Exception:
+        items = []
     items_total = float(row["items_total"] or 0)
     if (items_total == 0) and items:
         items_total = sum(float(i.get("price",0))*float(i.get("qty",1)) for i in items)
@@ -595,7 +602,7 @@ def order_detail(order_id):
     }
     return render_template("order_detail.html", order=order_obj)
 
-# ----------------------------- Admin panel (orders+items snippet page stays same)
+# ----------------------------- Admin panel
 @app.route("/admin", methods=["GET"])
 @admin_required
 def admin():
@@ -674,7 +681,6 @@ def admin_sections_edit(section_id):
 @admin_required
 def admin_sections_delete(section_id):
     db = get_db()
-    # unassign items
     db.execute("UPDATE menu_items SET section_id=NULL WHERE section_id=?;", (section_id,))
     db.execute("DELETE FROM sections WHERE id=?;", (section_id,))
     db.commit()
@@ -748,7 +754,7 @@ def admin_menu_delete(item_id):
     flash(f"Item #{item_id} deleted.", "info")
     return redirect(url_for("admin"))
 
-# ----------------------------- Admin: order status & email (unchanged)
+# ----------------------------- Admin: order status & email
 @csrf.exempt
 @app.route("/admin/orders/<int:order_id>/status", methods=["POST"])
 @admin_required
@@ -830,7 +836,7 @@ def admin_test_email():
     flash("Test email sent!" if ok else f"Email error: {err}", "success" if ok else "danger")
     return redirect(url_for("admin"))
 
-# ----------------------------- Public JSON APIs (unchanged logic) ...
+# ----------------------------- Public JSON APIs
 @app.route("/api/config", methods=["GET"])
 @csrf.exempt
 def api_config():
@@ -929,7 +935,8 @@ def api_driver_login():
 def api_driver_available():
     data = request.get_json(silent=True) or {}
     driver_id = int(data.get("driver_id") or 0)
-    if not driver_id: return jsonify({"ok": False, "error": "driver_id required"}), 400
+    if not driver_id:
+        return jsonify({"ok": False, "error": "driver_id required"}), 400
     available = 1 if (data.get("available") in (True, 1, "true", "yes", "on")) else 0
     lat = data.get("lat"); lng = data.get("lng")
     db = get_db()
@@ -950,7 +957,8 @@ def api_my_orders():
     db = get_db()
     if not user_id and email:
         u = db.execute("SELECT id FROM users WHERE email=?", (email,)).fetchone()
-        if not u: return jsonify({"ok": True, "orders": []})
+        if not u:
+            return jsonify({"ok": True, "orders": []})
         user_id = u["id"]
     if not user_id:
         return jsonify({"ok": False, "error": "email or user_id required"}), 400
@@ -963,8 +971,10 @@ def api_my_orders():
     """, (user_id,)).fetchall()
     out = []
     for r in rows:
-        try: items = json.loads(r["items_json"]) if r["items_json"] else []
-        except Exception: items = []
+        try:
+            items = json.loads(r["items_json"]) if r["items_json"] else []
+        except Exception:
+            items = []
         items_total = float(r["items_total"] or 0)
         if (items_total == 0) and items:
             items_total = sum(float(i.get("price",0))*float(i.get("qty",1)) for i in items)
@@ -1018,8 +1028,10 @@ def api_order():
     if email:
         u = db.execute("SELECT id, name FROM users WHERE email=?;", (email,)).fetchone()
         if not u:
-            db.execute("INSERT INTO users (name,email, password_hash) VALUES (?,?,?);",
-                       ((email.split("@")[0] or "Guest"), email, generate_password_hash(os.urandom(8).hex())))
+            db.execute(
+                "INSERT INTO users (name,email, password_hash) VALUES (?,?,?);",
+                ((email.split('@')[0] or "Guest"), email, generate_password_hash(os.urandom(8).hex()))
+            )
             db.commit()
             u = db.execute("SELECT id, name FROM users WHERE email=?;", (email,)).fetchone()
         user_id = u["id"]
@@ -1056,7 +1068,8 @@ def api_order():
 def api_order_status(order_id):
     db = get_db()
     row = db.execute("SELECT status, driver_status, driver_id FROM orders WHERE id=?;", (order_id,)).fetchone()
-    if not row: return jsonify({"ok": False, "error": "Not found"}), 404
+    if not row:
+        return jsonify({"ok": False, "error": "Not found"}), 404
     return jsonify({"ok": True, "order_id": order_id,
                     "status": row["status"], "driver_status": row["driver_status"], "driver_id": row["driver_id"]})
 
