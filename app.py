@@ -233,18 +233,7 @@ def init_db():
 
     db.commit()
 
-# ---- DB init should happen AFTER app is created (Render & local both)
-@app.before_first_request
-def startup_init():
-    try:
-        init_db()
-    except Exception as e:
-        try:
-            app.logger.warning("DB init failed: %s", e)
-        except Exception:
-            print("DB init failed:", e)
-
-# ---- Extra safety: initialize DB on import as well (avoids first-request race)
+# ---- Initialize DB on import (Flask 3 safe; works under gunicorn)
 try:
     with app.app_context():
         init_db()
