@@ -19,6 +19,12 @@ try:
     load_dotenv()
 except Exception:
     pass
+@app.before_first_request
+def startup_init():
+    try:
+        init_db()
+    except Exception as e:
+        print("DB init failed:", e)
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 DB_NAME  = os.environ.get("DB_NAME", "app.db")
