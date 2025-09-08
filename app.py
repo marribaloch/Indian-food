@@ -14,12 +14,32 @@ from flask_wtf.csrf import generate_csrf
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 
+# ------------------ load .env (if present)
 try:
     from dotenv import load_dotenv
     load_dotenv()
 except Exception:
     pass
 
+# ------------------ Flask app FIRST (very important for gunicorn app:app)
+app = Flask(__name__, template_folder="templates", static_folder="static")
+app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-change-me")
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+    SESSION_COOKIE_SECURE=True,
+    WTF_CSRF_TIME_LIMIT=None,
+)
+
+csrf = CSRFProtect(app)
+
+@app.context_processor
+def inject_csrf():
+    return dict(csrf_token=generate_csrf)
+
+limiter = Limiter(get_remote_address, app=app, default_limits=["200 per day", "50 per hour"])
+
+# ------------------ paths / DB file
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 DB_NAME  = os.environ.get("DB_NAME", "app.db")
 DATA_DIR = os.environ.get("DATA_DIR", "/var/data")
@@ -38,24 +58,6 @@ if DATA_DIR:
             pass
 else:
     DB_PATH = os.path.join(BASE_DIR, DB_NAME)
-
-app = Flask(__name__, template_folder="templates", static_folder="static")
-app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-change-me")
-
-app.config.update(
-    SESSION_COOKIE_HTTPONLY=True,
-    SESSION_COOKIE_SAMESITE="Lax",
-    SESSION_COOKIE_SECURE=True,
-    WTF_CSRF_TIME_LIMIT=None,
-)
-
-csrf = CSRFProtect(app)
-
-@app.context_processor
-def inject_csrf():
-    return dict(csrf_token=generate_csrf)
-
-limiter = Limiter(get_remote_address, app=app, default_limits=["200 per day", "50 per hour"])
 
 ALLOWED_ORIGINS = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "").split(",") if o.strip()]
 if not ALLOWED_ORIGINS:
@@ -131,7 +133,7 @@ def init_db():
             created_at TEXT DEFAULT CURRENT_TIMESTAMP
         );
     """)
-    # Sections (NEW)
+    # Sections
     db.execute("""
         CREATE TABLE IF NOT EXISTS sections (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -143,7 +145,7 @@ def init_db():
             created_at TEXT DEFAULT CURRENT_TIMESTAMP
         );
     """)
-    # Menu items + section_id (NEW)
+    # Menu items
     db.execute("""
         CREATE TABLE IF NOT EXISTS menu_items (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -242,19 +244,27 @@ def startup_init():
         except Exception:
             print("DB init failed:", e)
 
+# ---- Extra safety: initialize DB on import as well (avoids first-request race)
+try:
+    with app.app_context():
+        init_db()
+except Exception as e:
+    try:
+        app.logger.warning("DB init on import failed: %s", e)
+    except Exception:
+        print("DB init on import failed:", e)
+
 @app.route("/plain")
 def plain():
     return "<!doctype html><title>Plain</title><h1>Plain OK</h1>"
 
 # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-# NEW: safely wire in the separate drivers_api module (no break by default)
+# (optional) external drivers API
 try:
     from drivers_api import init_driver_api as _init_driver_api
-    # Enable only when you set:  ENABLE_NEW_DRIVER_API=1
     if os.getenv("ENABLE_NEW_DRIVER_API") in ("1", "true", "True", "yes", "on"):
         _init_driver_api(app, get_db)
-except Exception as _e:
-    # Silently ignore if file missing or import fails
+except Exception:
     pass
 # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
@@ -619,7 +629,7 @@ def admin():
                            items=items, orders=orders,
                            page=page, per_page=per_page, total_pages=total_pages, total_orders=total_orders)
 
-# ----------------------------- Admin: Sections CRUD (NEW)
+# ----------------------------- Admin: Sections CRUD
 @app.route("/admin/sections", methods=["GET"])
 @admin_required
 def admin_sections():
@@ -687,7 +697,7 @@ def admin_sections_delete(section_id):
     flash("Section deleted.", "info")
     return redirect(url_for("admin_sections"))
 
-# ----------------------------- Admin: Menu CRUD (add section_id support)
+# ----------------------------- Admin: Menu CRUD
 @csrf.exempt
 @app.route("/admin/menu/new", methods=["GET", "POST"])
 @admin_required
