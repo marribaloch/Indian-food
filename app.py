@@ -1,4 +1,4 @@
-# app.py — Indian Food App (+ Sections/Categories support)
+# app.py — Indian Food App (+ Sections/Categories support) [PERSISTENT DB + SEED]
 import os, json, sqlite3, datetime, smtplib, shutil, math, urllib.parse, urllib.request
 from email.message import EmailMessage
 from functools import wraps
@@ -39,25 +39,37 @@ def inject_csrf():
 
 limiter = Limiter(get_remote_address, app=app, default_limits=["200 per day", "50 per hour"])
 
-# ------------------ paths / DB file
+# ------------------ Paths / Persistent DB (single source of truth)
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-DB_NAME  = os.environ.get("DB_NAME", "app.db")
-DATA_DIR = os.environ.get("DATA_DIR", "/var/data")
 
-if DATA_DIR:
-    try:
-        os.makedirs(DATA_DIR, exist_ok=True)
-    except Exception:
-        pass
-    DB_PATH = os.path.join(DATA_DIR, DB_NAME)
-    legacy_db = os.path.join(BASE_DIR, DB_NAME)
-    if (not os.path.exists(DB_PATH)) and os.path.exists(legacy_db):
+# Preferred: explicit DB_PATH (e.g., /data/app.db on Render Disk)
+DB_PATH = os.environ.get("DB_PATH")
+
+# Backward compatibility: DATA_DIR + DB_NAME from your previous config
+if not DB_PATH:
+    DB_NAME  = os.environ.get("DB_NAME", "app.db")
+    DATA_DIR = os.environ.get("DATA_DIR")  # old style
+    if DATA_DIR:
+        # Ensure dir exists
         try:
-            shutil.copy2(legacy_db, DB_PATH)
+            os.makedirs(DATA_DIR, exist_ok=True)
         except Exception:
             pass
-else:
-    DB_PATH = os.path.join(BASE_DIR, DB_NAME)
+        DB_PATH = os.path.join(DATA_DIR, DB_NAME)
+    else:
+        # Local default: ./data/app.db
+        local_data_dir = os.path.join(BASE_DIR, "data")
+        os.makedirs(local_data_dir, exist_ok=True)
+        DB_PATH = os.path.join(local_data_dir, DB_NAME)
+
+# If a legacy DB sat in BASE_DIR, copy it once to the new place (first run only)
+legacy_db = os.path.join(BASE_DIR, os.environ.get("DB_NAME", "app.db"))
+if (DB_PATH and not os.path.exists(DB_PATH)) and os.path.exists(legacy_db):
+    try:
+        os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+        shutil.copy2(legacy_db, DB_PATH)
+    except Exception:
+        pass
 
 ALLOWED_ORIGINS = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "").split(",") if o.strip()]
 if not ALLOWED_ORIGINS:
@@ -102,8 +114,9 @@ GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY")
 # ----------------------------- DB Helpers
 def get_db():
     if "db" not in g:
-        g.db = sqlite3.connect(DB_PATH, detect_types=sqlite3.PARSE_DECLTYPES)
-    g.db.row_factory = sqlite3.Row
+        # check_same_thread False for gunicorn workers
+        g.db = sqlite3.connect(DB_PATH, detect_types=sqlite3.PARSE_DECLTYPES, check_same_thread=False)
+        g.db.row_factory = sqlite3.Row
     return g.db
 
 @app.teardown_appcontext
@@ -833,6 +846,90 @@ def admin_test_email():
     text = "This is a test email from Indian Food App."
     ok, err = send_email_safe(ADMIN_EMAIL_DEFAULT, "Test Email", sample_html or text, text_fallback=text)
     flash("Test email sent!" if ok else f"Email error: {err}", "success" if ok else "danger")
+    return redirect(url_for("admin"))
+
+# ----------------------------- QUICK SEED (admin only)
+@app.route("/admin/seed_menu")
+@admin_required
+def admin_seed_menu():
+    db = get_db()
+    # ensure one section
+    sec = db.execute("SELECT id FROM sections WHERE is_active=1 ORDER BY sort_order DESC, id DESC LIMIT 1").fetchone()
+    if not sec:
+        db.execute("INSERT INTO sections (name, is_active) VALUES (?,1)", ("Popular",))
+        db.commit()
+        sec = db.execute("SELECT id FROM sections WHERE is_active=1 ORDER BY id DESC LIMIT 1").fetchone()
+    sec_id = sec["id"]
+    # seed only if empty
+    cnt = db.execute("SELECT COUNT(*) c FROM menu_items WHERE is_active=1").fetchone()["c"]
+    if cnt == 0:
+        db.executemany(
+            "INSERT INTO menu_items (name, description, price, image_url, is_active, section_id) VALUES (?,?,?,?,1,?)",
+            [
+                ("Chicken Biryani", "Spicy basmati rice with chicken", 75000, "", sec_id),
+                ("Paneer Butter Masala", "Creamy tomato curry", 89000, "", sec_id),
+                ("Garlic Naan", "Tandoor-baked flatbread", 25000, "", sec_id),
+            ],
+        )
+        db.commit()
+        flash("Seeded 3 demo items.", "success")
+    else:
+        flash("Menu already has items.", "info")
+    return redirect(url_for("menu"))
+
+# ----------------------------- DIAG (read-only) + SELF-GRANT (safe)
+@csrf.exempt
+@app.route("/admin/diag")
+@login_required
+def admin_diag():
+    """Read-only health report."""
+    db = get_db()
+    def _count(q):
+        try:
+            return db.execute(q).fetchone()[0]
+        except Exception:
+            return None
+    try:
+        tpl_dir = os.path.join(BASE_DIR, "templates")
+        tpl_list = sorted([n for n in os.listdir(tpl_dir) if n.endswith(".html")])[:100]
+    except Exception:
+        tpl_list = []
+    try:
+        db_exists = os.path.exists(DB_PATH)
+        db_size = (os.path.getsize(DB_PATH) if db_exists else 0)
+    except Exception:
+        db_exists, db_size = False, 0
+    info = {
+        "db_path": DB_PATH,
+        "db_exists": db_exists,
+        "db_size_bytes": db_size,
+        "sections": _count("SELECT COUNT(*) FROM sections;"),
+        "menu_items": _count("SELECT COUNT(*) FROM menu_items;"),
+        "orders": _count("SELECT COUNT(*) FROM orders;"),
+        "admins": _count("SELECT COUNT(*) FROM users WHERE is_admin=1;"),
+        "you": {"id": session.get("user_id"), "email": session.get("email"), "is_admin": bool(session.get("is_admin"))},
+        "templates": tpl_list,
+    }
+    return jsonify(info), 200
+
+@csrf.exempt
+@app.route("/admin/self_grant")
+@login_required
+def admin_self_grant():
+    """Promote current logged-in user to admin ONLY if there is no admin in DB."""
+    db = get_db()
+    admins = db.execute("SELECT COUNT(*) FROM users WHERE is_admin=1;").fetchone()[0]
+    if admins and not session.get("is_admin"):
+        flash("Admin already exists — please ask an admin to grant access.", "warning")
+        return redirect(url_for("login"))
+    uid = session.get("user_id")
+    if not uid:
+        flash("Please log in first.", "warning")
+        return redirect(url_for("login"))
+    db.execute("UPDATE users SET is_admin=1 WHERE id=?;", (uid,))
+    db.commit()
+    session["is_admin"] = True
+    flash("You now have admin access.", "success")
     return redirect(url_for("admin"))
 
 # ----------------------------- Public JSON APIs
