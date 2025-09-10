@@ -1,26 +1,160 @@
 {% extends "layout.html" %}
 {% block title %}Driver Login{% endblock %}
+
 {% block content %}
 <div class="row justify-content-center">
   <div class="col-md-6">
     <div class="card shadow-sm">
       <div class="card-body">
         <h3 class="mb-3">Driver Login</h3>
-        <div id="msg" class="alert d-none"></div>
-        <div class="mb-3"><label class="form-label">Email</label><input class="form-control" id="email" type="email"></div>
-        <div class="mb-3"><label class="form-label">Password</label><input class="form-control" id="password" type="password"></div>
-        <button class="btn btn-primary" id="btnLogin">Login</button>
+
+        <div id="msg" class="alert d-none" role="alert"></div>
+
+        <div class="mb-3">
+          <label class="form-label" for="email">Email</label>
+          <input class="form-control" id="email" type="email" autocomplete="username" required>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label" for="password">Password</label>
+          <div class="input-group">
+            <input class="form-control" id="password" type="password" autocomplete="current-password" required>
+            <button class="btn btn-outline-secondary" type="button" id="togglePwd">Show</button>
+          </div>
+        </div>
+
+        <button class="btn btn-primary w-100" id="btnLogin">
+          <span class="login-text">Login</span>
+          <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+        </button>
+
+        <hr class="my-4">
+
+        <details>
+          <summary class="mb-2">Create a driver account (quick setup)</summary>
+          <div class="alert alert-warning small">
+            This uses the existing <code>/api/driver/register</code> endpoint and only creates a
+            user with <code>is_driver=1</code>. It does not change any other data.
+          </div>
+          <div class="mb-2">
+            <label class="form-label" for="r_name">Name</label>
+            <input class="form-control" id="r_name" type="text" placeholder="Driver Name">
+          </div>
+          <div class="mb-2">
+            <label class="form-label" for="r_email">Email</label>
+            <input class="form-control" id="r_email" type="email" placeholder="driver@example.com">
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="r_password">Password</label>
+            <input class="form-control" id="r_password" type="password" placeholder="••••••••">
+          </div>
+          <button class="btn btn-outline-primary" id="btnRegister">Create Driver</button>
+        </details>
       </div>
     </div>
   </div>
 </div>
+
 <script>
-document.getElementById('btnLogin').onclick=async()=>{
-  const res = await fetch('/api/driver/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:email.value,password:password.value})});
-  const data = await res.json(); const msg=document.getElementById('msg');
-  if(!data.ok){ msg.className='alert alert-danger'; msg.textContent=data.error||'Login failed'; msg.classList.remove('d-none'); return; }
-  localStorage.setItem('driver', JSON.stringify(data.driver));
-  location.href='/driver_dashboard';
-};
+(function () {
+  const $ = (s) => document.querySelector(s);
+  const msg = $('#msg');
+  const btnLogin = $('#btnLogin');
+  const spinner = btnLogin.querySelector('.spinner-border');
+  const loginText = btnLogin.querySelector('.login-text');
+
+  function showMsg(type, text) {
+    msg.className = 'alert alert-' + type;
+    msg.textContent = text;
+    msg.classList.remove('d-none');
+  }
+  function clearMsg() {
+    msg.classList.add('d-none');
+    msg.textContent = '';
+  }
+  function setBusy(busy) {
+    btnLogin.disabled = !!busy;
+    spinner.classList.toggle('d-none', !busy);
+    loginText.textContent = busy ? 'Logging in...' : 'Login';
+  }
+
+  // Toggle password visibility
+  $('#togglePwd').addEventListener('click', () => {
+    const i = $('#password');
+    i.type = (i.type === 'password') ? 'text' : 'password';
+    $('#togglePwd').textContent = (i.type === 'password') ? 'Show' : 'Hide';
+  });
+
+  // Submit on Enter
+  ['email','password'].forEach(id => {
+    document.getElementById(id).addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') btnLogin.click();
+    });
+  });
+
+  // Driver login
+  btnLogin.addEventListener('click', async () => {
+    clearMsg();
+    const email = $('#email').value.trim().toLowerCase();
+    const password = $('#password').value;
+    if (!email || !password) {
+      showMsg('danger', 'Please enter email and password.');
+      return;
+    }
+    setBusy(true);
+    try {
+      const res = await fetch('/api/driver/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+      const data = await res.json();
+      if (!data.ok) {
+        showMsg('danger', data.error || 'Invalid driver credentials');
+        return;
+      }
+      // Save minimal driver info for dashboard use
+      localStorage.setItem('driver', JSON.stringify(data.driver || {}));
+      window.location.href = '/driver_dashboard';
+    } catch (err) {
+      showMsg('danger', 'Network error. Please try again.');
+    } finally {
+      setBusy(false);
+    }
+  });
+
+  // Quick driver register (optional helper)
+  const btnRegister = $('#btnRegister');
+  if (btnRegister) {
+    btnRegister.addEventListener('click', async () => {
+      clearMsg();
+      const name = ($('#r_name').value || '').trim() || 'Driver';
+      const email = ($('#r_email').value || '').trim().toLowerCase();
+      const password = $('#r_password').value || '';
+      if (!email || !password) {
+        showMsg('warning', 'Email and password are required to create a driver.');
+        return;
+      }
+      try {
+        const res = await fetch('/api/driver/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, email, password })
+        });
+        const data = await res.json();
+        if (!data.ok) {
+          showMsg('danger', data.error || 'Could not create driver.');
+          return;
+        }
+        showMsg('success', 'Driver created. You can log in now.');
+        // prefill login
+        $('#email').value = email;
+        $('#password').value = password;
+      } catch (e) {
+        showMsg('danger', 'Network error while creating driver.');
+      }
+    });
+  }
+})();
 </script>
 {% endblock %}

@@ -7,6 +7,7 @@
 #  - Persistent DB path: ENV DB_PATH -> /var/data -> ./data
 #  - Menu backup/restore JSON
 #  - NEW: admin_simple back-compat route to stop BuildError from templates
+#  - NEW: /admin/orders (status filter, robust + template fallback)
 
 import os, json, sqlite3, datetime, smtplib, shutil, math, urllib.parse, urllib.request
 from email.message import EmailMessage
@@ -22,6 +23,7 @@ from flask_wtf.csrf import generate_csrf
 
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from jinja2 import TemplateNotFound  # <-- for graceful fallback
 
 # ------------------ load .env (if present)
 try:
@@ -694,6 +696,59 @@ def admin():
     }
 
     return render_template("admin.html", items=items, orders=orders, stats=stats)
+
+# ----------------------------- NEW: Admin orders with status filter (robust)
+@app.route("/admin/orders", methods=["GET"])
+@admin_required
+def admin_orders():
+    status = (request.args.get("status") or "").strip().lower()
+    allowed_status = {
+        "pending", "confirmed", "preparing", "ready",
+        "picked_up", "out_for_delivery", "delivered", "cancelled"
+    }
+
+    sql = """
+        SELECT 
+            o.id,
+            COALESCE(o.created_at,'') AS created_at,
+            COALESCE(o.status,'pending') AS status,
+            COALESCE(o.grand_total, o.total, 0) AS total,
+            u.name AS user_name
+        FROM orders o
+        LEFT JOIN users u ON u.id = o.user_id
+    """
+    params = []
+    if status and status in allowed_status:
+        sql += " WHERE lower(o.status) = ?"
+        params.append(status)
+    sql += " ORDER BY o.id DESC LIMIT 200"
+
+    try:
+        rows = get_db().execute(sql, params).fetchall()
+        # Try template first; if missing, fall back to inline HTML
+        try:
+            return render_template("admin_orders.html", orders=rows, active_status=status)
+        except TemplateNotFound:
+            pass
+
+        # Fallback minimal HTML (no template required)
+        hdr = f"<h2>Orders{(' · ' + status.title()) if status else ''}</h2>"
+        table = ["<table border=1 cellpadding=6 cellspacing=0>",
+                 "<tr><th>#</th><th>Customer</th><th>Total</th><th>Status</th><th>Placed</th></tr>"]
+        for r in rows:
+            table.append(
+                f"<tr><td>{r['id']}</td>"
+                f"<td>{(r['user_name'] or '—')}</td>"
+                f"<td>{int(r['total'])} VND</td>"
+                f"<td>{r['status']}</td>"
+                f"<td>{r['created_at']}</td></tr>"
+            )
+        table.append("</table>")
+        return "".join([hdr] + table)
+    except Exception as e:
+        app.logger.exception("admin_orders failed: %s", e)
+        flash("Could not load orders (see logs).", "danger")
+        return redirect(url_for("admin"))
 
 # ----------------------------- Simple Admin & Driver HTML wrappers (NEW)
 # Back-compat shim: many templates use url_for('admin_simple')
