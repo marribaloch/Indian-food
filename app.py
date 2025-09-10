@@ -6,6 +6,7 @@
 #  - Safe helpers (safe_query/safe_count)
 #  - Persistent DB path: ENV DB_PATH -> /var/data -> ./data
 #  - Menu backup/restore JSON
+#  - NEW: admin_simple back-compat route to stop BuildError from templates
 
 import os, json, sqlite3, datetime, smtplib, shutil, math, urllib.parse, urllib.request
 from email.message import EmailMessage
@@ -44,7 +45,6 @@ csrf = CSRFProtect(app)
 # --- CSRF token in Jinja (use {{ csrf_token() }})
 @app.context_processor
 def inject_csrf():
-    # single call returns token string
     return dict(csrf_token=generate_csrf)
 
 limiter = Limiter(get_remote_address, app=app, default_limits=["200 per day", "50 per hour"])
@@ -52,7 +52,7 @@ limiter = Limiter(get_remote_address, app=app, default_limits=["200 per day", "5
 # ------------------ Paths / Persistent DB (ENV -> /var/data -> ./data)
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
-DB_PATH = os.environ.get("DB_PATH")  # prefer explicit env if provided
+DB_PATH = os.environ.get("DB_PATH")
 if not DB_PATH:
     VAR_DATA_DIR = "/var/data"  # Render disk mount
     if os.path.isdir(VAR_DATA_DIR):
@@ -65,7 +65,6 @@ if not DB_PATH:
         DB_PATH = os.path.join(local_data_dir, "app.db")
         MENU_BACKUP_PATH = os.path.join(local_data_dir, "menu_backup.json")
 else:
-    # If DB_PATH came from env, keep backup JSON in same dir
     try:
         os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     except Exception:
@@ -127,7 +126,6 @@ GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY")
 # ----------------------------- DB Helpers
 def get_db():
     if "db" not in g:
-        # check_same_thread False for gunicorn workers
         g.db = sqlite3.connect(DB_PATH, detect_types=sqlite3.PARSE_DECLTYPES, check_same_thread=False)
         g.db.row_factory = sqlite3.Row
     return g.db
@@ -564,7 +562,6 @@ def my_orders():
     uid = session["user_id"]
     page, per_page, offset = _get_page_per_page(default_per_page=20, max_per_page=100)
 
-    # Try modern columns; fallback if missing
     try:
         total_rows = db.execute("SELECT COUNT(*) AS c FROM orders WHERE user_id=?;", (uid,)).fetchone()["c"]
         rows = db.execute("""
@@ -660,11 +657,10 @@ def order_detail(order_id):
     }
     return render_template("order_detail.html", order=order_obj)
 
-# ----------------------------- Crash-proof Admin dashboard
+# ----------------------------- Admin (full)
 @app.route("/admin", methods=["GET"])
 @admin_required
 def admin():
-    # Menu items (page crash nahi karega)
     items = safe_query("""
         SELECT 
           id, 
@@ -677,7 +673,6 @@ def admin():
         LIMIT 100
     """) or []
 
-    # Recent orders + user info
     orders = safe_query("""
         SELECT 
           o.id,
@@ -699,6 +694,40 @@ def admin():
     }
 
     return render_template("admin.html", items=items, orders=orders, stats=stats)
+
+# ----------------------------- Simple Admin & Driver HTML wrappers (NEW)
+# Back-compat shim: many templates use url_for('admin_simple')
+@app.route("/admin_simple", methods=["GET"])
+@admin_required
+def admin_simple():
+    items = safe_query(
+        "SELECT id, COALESCE(name,'') name, COALESCE(price,0) price "
+        "FROM menu_items ORDER BY id DESC LIMIT 50"
+    ) or []
+    orders = safe_query(
+        "SELECT id, COALESCE(total,0) total, COALESCE(status,'pending') status, "
+        "COALESCE(created_at,'') created_at FROM orders ORDER BY id DESC LIMIT 50"
+    ) or []
+    html = ["<h2>Admin (Simple)</h2><p><a href='/admin'>Full dashboard</a></p>"]
+    html.append("<h3>Orders</h3><ul>")
+    for o in orders:
+        html.append(
+            f"<li>#{o['id']} · {o['status']} · {int(o['total'])} · {o['created_at']} "
+            f"· <a href='/order/{o['id']}'>view</a></li>"
+        )
+    html.append("</ul><h3>Items</h3><ul>")
+    for it in items:
+        html.append(f"<li>{it['id']} · {it['name']} · {int(it['price'])}</li>")
+    html.append("</ul>")
+    return "".join(html)
+
+@app.route("/driver_login")
+def driver_login_page():
+    return render_template("driver_login.html")
+
+@app.route("/driver_dashboard")
+def driver_dashboard_page():
+    return render_template("driver_dashboard.html")
 
 # ----------------------------- Admin: Sections CRUD
 @app.route("/admin/sections", methods=["GET"])
@@ -918,14 +947,12 @@ def admin_test_email():
 @admin_required
 def admin_seed_menu():
     db = get_db()
-    # ensure one section
     sec = db.execute("SELECT id FROM sections WHERE is_active=1 ORDER BY sort_order DESC, id DESC LIMIT 1").fetchone()
     if not sec:
         db.execute("INSERT INTO sections (name, is_active) VALUES (?,1)", ("Popular",))
         db.commit()
         sec = db.execute("SELECT id FROM sections WHERE is_active=1 ORDER BY id DESC LIMIT 1").fetchone()
     sec_id = sec["id"]
-    # seed only if empty
     cnt = db.execute("SELECT COUNT(*) c FROM menu_items WHERE is_active=1").fetchone()["c"]
     if cnt == 0:
         db.executemany(
@@ -970,7 +997,6 @@ def admin_restore_menu():
         with open(MENU_BACKUP_PATH, "r", encoding="utf-8") as f:
             data = json.load(f)
         db = get_db()
-        # Merge restore (no deletes) — upsert by name
         sec_id_map = {}
         for s in data.get("sections", []):
             name = (s.get("name") or "").strip()
@@ -1018,7 +1044,6 @@ def admin_restore_menu():
 @app.route("/admin/diag")
 @login_required
 def admin_diag():
-    """Read-only health report."""
     db = get_db()
     def _count(q):
         try:
@@ -1052,7 +1077,6 @@ def admin_diag():
 @app.route("/admin/self_grant")
 @login_required
 def admin_self_grant():
-    """Promote current logged-in user to admin ONLY if there is no admin in DB."""
     db = get_db()
     admins = db.execute("SELECT COUNT(*) FROM users WHERE is_admin=1;").fetchone()[0]
     if admins and not session.get("is_admin"):
