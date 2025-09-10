@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # app.py — Indian Food App (+ Sections/Categories support)
 # PERSISTENT DB + SEED + BACKUP/RESTORE + LEGACY-SAFE
 # Changes vs purana:
@@ -5,6 +6,9 @@
 #  - /admin uses crash-proof queries (no 500 if some cols missing)
 #  - Small helpers (safe_query/safe_count) & a few tidy-ups
 
+=======
+# app.py — Indian Food App (+ Sections/Categories support) [PERSISTENT DB + SEED]
+>>>>>>> 072459a5eab4df5a3919ad60b169c806c8965892
 import os, json, sqlite3, datetime, smtplib, shutil, math, urllib.parse, urllib.request
 from email.message import EmailMessage
 from functools import wraps
@@ -47,6 +51,7 @@ def inject_csrf():
 
 limiter = Limiter(get_remote_address, app=app, default_limits=["200 per day", "50 per hour"])
 
+<<<<<<< HEAD
 # ------------------ Paths / Persistent DB (waada: /var/data/app.db on server)
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 VAR_DATA_DIR = "/var/data"  # render disk mount
@@ -60,6 +65,31 @@ else:
     DB_PATH = os.path.join(local_data_dir, "app.db")
     MENU_BACKUP_PATH = os.path.join(local_data_dir, "menu_backup.json")
 
+=======
+# ------------------ Paths / Persistent DB (single source of truth)
+BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+
+# Preferred: explicit DB_PATH (e.g., /data/app.db on Render Disk)
+DB_PATH = os.environ.get("DB_PATH")
+
+# Backward compatibility: DATA_DIR + DB_NAME from your previous config
+if not DB_PATH:
+    DB_NAME  = os.environ.get("DB_NAME", "app.db")
+    DATA_DIR = os.environ.get("DATA_DIR")  # old style
+    if DATA_DIR:
+        # Ensure dir exists
+        try:
+            os.makedirs(DATA_DIR, exist_ok=True)
+        except Exception:
+            pass
+        DB_PATH = os.path.join(DATA_DIR, DB_NAME)
+    else:
+        # Local default: ./data/app.db
+        local_data_dir = os.path.join(BASE_DIR, "data")
+        os.makedirs(local_data_dir, exist_ok=True)
+        DB_PATH = os.path.join(local_data_dir, DB_NAME)
+
+>>>>>>> 072459a5eab4df5a3919ad60b169c806c8965892
 # If a legacy DB sat in BASE_DIR, copy it once to the new place (first run only)
 legacy_db = os.path.join(BASE_DIR, os.environ.get("DB_NAME", "app.db"))
 if (DB_PATH and not os.path.exists(DB_PATH)) and os.path.exists(legacy_db):
@@ -112,6 +142,10 @@ GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY")
 # ----------------------------- DB Helpers
 def get_db():
     if "db" not in g:
+<<<<<<< HEAD
+=======
+        # check_same_thread False for gunicorn workers
+>>>>>>> 072459a5eab4df5a3919ad60b169c806c8965892
         g.db = sqlite3.connect(DB_PATH, detect_types=sqlite3.PARSE_DECLTYPES, check_same_thread=False)
         g.db.row_factory = sqlite3.Row
     return g.db
@@ -926,6 +960,7 @@ def admin_seed_menu():
         flash("Menu already has items.", "info")
     return redirect(url_for("menu"))
 
+<<<<<<< HEAD
 # ----------------------------- BACKUP & RESTORE (JSON)  — /var/data/menu_backup.json
 @app.route("/admin/backup_menu")
 @admin_required
@@ -997,11 +1032,17 @@ def admin_restore_menu():
         flash(f"Restore error: {e}", "danger")
     return redirect(url_for("admin_sections"))
 
+=======
+>>>>>>> 072459a5eab4df5a3919ad60b169c806c8965892
 # ----------------------------- DIAG (read-only) + SELF-GRANT (safe)
 @csrf.exempt
 @app.route("/admin/diag")
 @login_required
 def admin_diag():
+<<<<<<< HEAD
+=======
+    """Read-only health report."""
+>>>>>>> 072459a5eab4df5a3919ad60b169c806c8965892
     db = get_db()
     def _count(q):
         try:
@@ -1035,6 +1076,10 @@ def admin_diag():
 @app.route("/admin/self_grant")
 @login_required
 def admin_self_grant():
+<<<<<<< HEAD
+=======
+    """Promote current logged-in user to admin ONLY if there is no admin in DB."""
+>>>>>>> 072459a5eab4df5a3919ad60b169c806c8965892
     db = get_db()
     admins = db.execute("SELECT COUNT(*) FROM users WHERE is_admin=1;").fetchone()[0]
     if admins and not session.get("is_admin"):
