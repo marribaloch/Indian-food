@@ -1,52 +1,65 @@
 {% extends "layout.html" %}
-<label for="price">Price (VND)</label>
-</div>
-<div class="form-floating mb-3">
-<select class="form-select" id="section_id" name="section_id" required>
-<option value="" disabled {{ 'selected' if not item }}>Choose…</option>
-{% for s in sections or [] %}
-<option value="{{ s.id }}" {{ 'selected' if item and item.section_id == s.id else '' }}>{{ s.name }}</option>
-{% endfor %}
-</select>
-<label for="section_id">Section</label>
-</div>
-<div class="form-check form-switch mb-3">
-<input class="form-check-input" type="checkbox" id="is_available" name="is_available" value="1" {{ 'checked' if (item and item.is_available) or (not item) else '' }}>
-<label class="form-check-label" for="is_available">Available</label>
-</div>
-</div>
+{% block title %}{{ 'Edit Item' if item and item.id else 'Add Item' }} · Indian Food App{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h2 class="mb-0">{{ 'Edit Item' if item and item.id else 'Add Item' }}</h2>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('admin_items') if 'admin_items' in globals() else url_for('admin') }}" class="btn btn-outline-secondary btn-sm">Back</a>
+  </div>
 </div>
 
+<div class="card shadow-sm">
+  <div class="card-body">
+    <form method="post" action="{{ action_url or '' }}" enctype="multipart/form-data">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
-<div class="row g-3">
-<div class="col-12 col-md-6">
-<div class="form-floating mb-3">
-<input type="text" class="form-control" id="photo" name="photo" placeholder="photo filename or URL" value="{{ item.photo if item else '' }}">
-<label for="photo">Photo (filename or URL)</label>
-</div>
-</div>
-<div class="col-12 col-md-6">
-<div class="mb-2 small text-secondary">Preview</div>
-<div class="ratio ratio-16x9 border rounded bg-light d-flex align-items-center justify-content-center overflow-hidden">
-{% if item and item.photo %}
-<img src="{{ url_for('static', filename='images/' ~ item.photo) if not ('http://' in item.photo or 'https://' in item.photo) else item.photo }}" class="img-fluid" alt="{{ item.name }}">
-{% else %}
-<div class="text-secondary">No image selected</div>
-{% endif %}
-</div>
-</div>
-</div>
-</div>
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label">Name</label>
+          <input type="text" class="form-control" name="name" value="{{ (form.name if form else item.name) if (form or item) else '' }}" required>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Price</label>
+          <input type="number" class="form-control" name="price" step="1" min="0" value="{{ (form.price if form else item.price) if (form or item) else '' }}" required>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Available</label>
+          <select name="is_available" class="form-select">
+            {% set avail = (form.is_available if form is defined else (item.is_available if item else 1)) %}
+            <option value="1" {% if avail in [1, '1', True, 'true'] %}selected{% endif %}>Yes</option>
+            <option value="0" {% if avail in [0, '0', False, 'false'] %}selected{% endif %}>No</option>
+          </select>
+        </div>
 
+        <div class="col-md-6">
+          <label class="form-label">Section / Category</label>
+          <select name="section_id" class="form-select">
+            <option value="">— None —</option>
+            {% for s in sections or [] %}
+              <option value="{{ s.id }}" {% if (item and item.section_id==s.id) or (form and form.section_id==s.id) %}selected{% endif %}>{{ s.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
 
-<div class="card-footer d-flex justify-content-between align-items-center">
-{% if item and item.id %}
-<button type="submit" class="btn btn-primary">Update</button>
-<a href="{{ url_for('delete_item', item_id=item.id) }}" class="btn btn-outline-danger" onclick="return confirm('Delete this item?')">Delete</a>
-{% else %}
-<button type="submit" class="btn btn-success">Create</button>
-{% endif %}
-</div>
-</form>
+        <div class="col-md-6">
+          <label class="form-label">Photo (optional)</label>
+          <input type="file" class="form-control" name="photo">
+          {% if item and item.photo %}
+            <div class="form-text">Current: {{ item.photo }}</div>
+          {% endif %}
+        </div>
+
+        <div class="col-12">
+          <label class="form-label">Description</label>
+          <textarea class="form-control" name="description" rows="3" placeholder="Short description...">{{ (form.description if form else item.description) if (form or item) else '' }}</textarea>
+        </div>
+      </div>
+
+      <div class="d-flex gap-2 mt-4">
+        <button class="btn btn-primary">{{ 'Update' if item and item.id else 'Create' }}</button>
+        <a href="{{ url_for('admin_items') if 'admin_items' in globals() else url_for('admin') }}" class="btn btn-outline-secondary">Cancel</a>
+      </div>
+    </form>
+  </div>
 </div>
 {% endblock %}

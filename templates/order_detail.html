@@ -1,55 +1,114 @@
 {% extends "layout.html" %}
-<td class="text-end">{{ sub | vnd }}</td>
-</tr>
-{% else %}
-<tr><td colspan="5" class="text-center text-secondary py-4">No items.</td></tr>
-{% endfor %}
-</tbody>
-<tfoot class="table-light">
-<tr>
-<th colspan="4" class="text-end">Total</th>
-<th class="text-end">{{ (order.total or grand) | vnd }}</th>
-</tr>
-</tfoot>
-</table>
-</div>
-</div>
+{% block title %}Order #{{ order.id }} · Indian Food App{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h2 class="mb-0">Order #{{ order.id }}</h2>
+  <div class="d-flex gap-2">
+    {% if session.get('is_admin') %}
+      <a href="{{ url_for('admin_orders') if 'admin_orders' in globals() else url_for('admin') }}" class="btn btn-outline-secondary btn-sm">Back</a>
+    {% else %}
+      <a href="{{ url_for('my_orders') }}" class="btn btn-outline-secondary btn-sm">My Orders</a>
+    {% endif %}
+  </div>
 </div>
 
+<div class="row g-4">
+  <div class="col-lg-7">
+    <div class="card shadow-sm h-100">
+      <div class="card-header"><strong>Items</strong></div>
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>#</th>
+              <th>Item</th>
+              <th class="text-center">Qty</th>
+              <th class="text-end">Price</th>
+              <th class="text-end">Subtotal</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% set grand = 0 %}
+            {% for li in order.items %}
+            {% set sub = (li.price or 0) * (li.qty or 1) %}
+            {% set grand = grand + sub %}
+            <tr>
+              <td>{{ loop.index }}</td>
+              <td class="text-truncate" style="max-width:240px">{{ li.name }}</td>
+              <td class="text-center">{{ li.qty }}</td>
+              <td class="text-end">{{ (li.price or 0)|vnd }}</td>
+              <td class="text-end">{{ sub|vnd }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot class="table-light">
+            <tr>
+              <th colspan="4" class="text-end">Total</th>
+              <th class="text-end">{{ (order.total or grand)|vnd }}</th>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+  </div>
 
-<div class="col-12 col-lg-4">
-<div class="card shadow-sm h-100">
-<div class="card-header"><strong>Customer</strong></div>
-<div class="card-body">
-<div class="mb-2"><span class="text-secondary small">Name</span><div class="fw-medium">{{ order.customer_name or order.name or '—' }}</div></div>
-<div class="mb-2"><span class="text-secondary small">Phone</span><div class="fw-medium">{{ order.phone or '—' }}</div></div>
-<div class="mb-2"><span class="text-secondary small">Address</span><div class="fw-medium">{{ order.address or '—' }}</div></div>
-<div class="mb-2"><span class="text-secondary small">Created</span><div class="fw-medium">{{ order.created_at }}</div></div>
-<div class="mb-2"><span class="text-secondary small">Status</span><div>
-<span class="badge text-bg-{{ 'warning' if order.status=='pending' else 'info' if order.status=='preparing' else 'primary' if order.status=='on_the_way' else 'success' if order.status=='delivered' else 'secondary' }}">{{ order.status|capitalize }}</span>
-</div></div>
+  <div class="col-lg-5">
+    <div class="card shadow-sm mb-4">
+      <div class="card-header"><strong>Summary</strong></div>
+      <div class="card-body">
+        <div class="row mb-2">
+          <div class="col-4 text-muted">Customer</div>
+          <div class="col-8">{{ order.customer_name or order.user_name or '—' }}</div>
+        </div>
+        <div class="row mb-2">
+          <div class="col-4 text-muted">Phone</div>
+          <div class="col-8">{{ order.phone or '—' }}</div>
+        </div>
+        <div class="row mb-2">
+          <div class="col-4 text-muted">Address</div>
+          <div class="col-8">{{ order.address or '—' }}</div>
+        </div>
+        <div class="row mb-2 align-items-center">
+          <div class="col-4 text-muted">Status</div>
+          <div class="col-8">
+            <span class="badge text-bg-{% if order.status=='pending' %}warning{% elif order.status=='confirmed' %}info{% elif order.status=='preparing' %}secondary{% elif order.status=='out_for_delivery' %}primary{% elif order.status=='delivered' %}success{% else %}light{% endif %}">
+              {{ order.status|replace('_',' ')|title }}
+            </span>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col-4 text-muted">Placed</div>
+          <div class="col-8">{{ order.created_at or order.placed_at or '' }}</div>
+        </div>
+      </div>
+    </div>
 
-
-{% if session.get('is_admin') %}
-<hr>
-<form class="d-grid gap-2" method="post" action="{{ url_for('admin_update_order_status', order_id=order.id) }}">
-<div class="form-floating">
-<select class="form-select" id="status" name="status" required>
-{% set s = (order.status or 'pending') %}
-<option value="pending" {{ 'selected' if s=='pending' else '' }}>Pending</option>
-<option value="preparing" {{ 'selected' if s=='preparing' else '' }}>Preparing</option>
-<option value="on_the_way" {{ 'selected' if s=='on_the_way' else '' }}>On the way</option>
-<option value="delivered" {{ 'selected' if s=='delivered' else '' }}>Delivered</option>
-<option value="cancelled" {{ 'selected' if s=='cancelled' else '' }}>Cancelled</option>
-</select>
-<label for="status">Update Status</label>
-</div>
-<button type="submit" class="btn btn-primary">Save</button>
-</form>
-{% endif %}
-</div>
-</div>
-</div>
-</div>
+    {% if session.get('is_admin') %}
+    <div class="card shadow-sm">
+      <div class="card-header"><strong>Update Status (Admin)</strong></div>
+      <div class="card-body">
+        <form method="post" action="{{ url_for('order_detail', order_id=order.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="mb-3">
+            <label class="form-label">Status</label>
+            <select name="status" class="form-select" required>
+              {% for s in ['pending','confirmed','preparing','out_for_delivery','delivered','cancelled'] %}
+                <option value="{{ s }}" {% if order.status==s %}selected{% endif %}>{{ s|replace('_',' ')|title }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Admin Note (optional)</label>
+            <textarea name="admin_note" class="form-control" rows="2" placeholder="Note for log / email"></textarea>
+          </div>
+          <div class="d-flex gap-2">
+            <button class="btn btn-primary">Save</button>
+            <a class="btn btn-outline-secondary" href="{{ url_for('admin_orders') if 'admin_orders' in globals() else url_for('admin') }}">Cancel</a>
+          </div>
+        </form>
+      </div>
+    </div>
+    {% endif %}
+  </div>
 </div>
 {% endblock %}

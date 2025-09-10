@@ -1,4 +1,10 @@
 # app.py — Indian Food App (+ Sections/Categories support)
+# PERSISTENT DB + SEED + BACKUP/RESTORE + LEGACY-SAFE
+# Changes vs purana:
+#  - CSRF helper now single-call: use {{ csrf_token() }} in templates
+#  - /admin uses crash-proof queries (no 500 if some cols missing)
+#  - Small helpers (safe_query/safe_count) & a few tidy-ups
+
 import os, json, sqlite3, datetime, smtplib, shutil, math, urllib.parse, urllib.request
 from email.message import EmailMessage
 from functools import wraps
@@ -21,7 +27,7 @@ try:
 except Exception:
     pass
 
-# ------------------ Flask app FIRST (very important for gunicorn app:app)
+# ------------------ Flask app FIRST
 app = Flask(__name__, template_folder="templates", static_folder="static")
 app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-change-me")
 app.config.update(
@@ -33,31 +39,35 @@ app.config.update(
 
 csrf = CSRFProtect(app)
 
+# --- CSRF token in Jinja (use {{ csrf_token() }})
 @app.context_processor
 def inject_csrf():
+    # standard: single call returns token string
     return dict(csrf_token=generate_csrf)
 
 limiter = Limiter(get_remote_address, app=app, default_limits=["200 per day", "50 per hour"])
 
-# ------------------ paths / DB file
+# ------------------ Paths / Persistent DB (waada: /var/data/app.db on server)
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-DB_NAME  = os.environ.get("DB_NAME", "app.db")
-DATA_DIR = os.environ.get("DATA_DIR", "/var/data")
+VAR_DATA_DIR = "/var/data"  # render disk mount
+if os.path.isdir(VAR_DATA_DIR):
+    os.makedirs(VAR_DATA_DIR, exist_ok=True)
+    DB_PATH = os.path.join(VAR_DATA_DIR, "app.db")
+    MENU_BACKUP_PATH = os.path.join(VAR_DATA_DIR, "menu_backup.json")
+else:
+    local_data_dir = os.path.join(BASE_DIR, "data")
+    os.makedirs(local_data_dir, exist_ok=True)
+    DB_PATH = os.path.join(local_data_dir, "app.db")
+    MENU_BACKUP_PATH = os.path.join(local_data_dir, "menu_backup.json")
 
-if DATA_DIR:
+# If a legacy DB sat in BASE_DIR, copy it once to the new place (first run only)
+legacy_db = os.path.join(BASE_DIR, os.environ.get("DB_NAME", "app.db"))
+if (DB_PATH and not os.path.exists(DB_PATH)) and os.path.exists(legacy_db):
     try:
-        os.makedirs(DATA_DIR, exist_ok=True)
+        os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+        shutil.copy2(legacy_db, DB_PATH)
     except Exception:
         pass
-    DB_PATH = os.path.join(DATA_DIR, DB_NAME)
-    legacy_db = os.path.join(BASE_DIR, DB_NAME)
-    if (not os.path.exists(DB_PATH)) and os.path.exists(legacy_db):
-        try:
-            shutil.copy2(legacy_db, DB_PATH)
-        except Exception:
-            pass
-else:
-    DB_PATH = os.path.join(BASE_DIR, DB_NAME)
 
 ALLOWED_ORIGINS = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "").split(",") if o.strip()]
 if not ALLOWED_ORIGINS:
@@ -102,8 +112,8 @@ GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY")
 # ----------------------------- DB Helpers
 def get_db():
     if "db" not in g:
-        g.db = sqlite3.connect(DB_PATH, detect_types=sqlite3.PARSE_DECLTYPES)
-    g.db.row_factory = sqlite3.Row
+        g.db = sqlite3.connect(DB_PATH, detect_types=sqlite3.PARSE_DECLTYPES, check_same_thread=False)
+        g.db.row_factory = sqlite3.Row
     return g.db
 
 @app.teardown_appcontext
@@ -114,8 +124,7 @@ def close_db(_exc):
 
 def _safe_alter(db, sql):
     try:
-        db.execute(sql)
-        db.commit()
+        db.execute(sql); db.commit()
     except Exception:
         pass
 
@@ -194,7 +203,7 @@ def init_db():
         )
         db.commit()
 
-    # migrations
+    # migrations (additive only)
     _safe_alter(db, "ALTER TABLE users ADD COLUMN is_driver INTEGER DEFAULT 0")
     _safe_alter(db, "ALTER TABLE orders ADD COLUMN driver_id INTEGER")
     _safe_alter(db, "ALTER TABLE orders ADD COLUMN driver_status TEXT")
@@ -233,7 +242,7 @@ def init_db():
 
     db.commit()
 
-# ---- Initialize DB on import (Flask 3 safe; works under gunicorn)
+# ---- Initialize DB on import
 try:
     with app.app_context():
         init_db()
@@ -247,15 +256,14 @@ except Exception as e:
 def plain():
     return "<!doctype html><title>Plain</title><h1>Plain OK</h1>"
 
-# >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-# (optional) external drivers API
+# >>> optional external drivers API
 try:
     from drivers_api import init_driver_api as _init_driver_api
     if os.getenv("ENABLE_NEW_DRIVER_API") in ("1", "true", "True", "yes", "on"):
         _init_driver_api(app, get_db)
 except Exception:
     pass
-# <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+# <<<
 
 # ----------------------------- Auth Helpers
 def login_required(f):
@@ -377,11 +385,25 @@ def compute_dynamic_delivery_fee(pu_lat, pu_lng, do_lat, do_lng):
         dist_km = haversine_km(pu_lat, pu_lng, do_lat, do_lng)
         dur_min = (dist_km * 3.0) * time_of_day_multiplier()
     fee = base + (per_km * max(dist_km, 0)) + (per_min * max(dur_min, 0))
-    if min_fee > 0:
-        fee = max(fee, min_fee)
-    if max_fee > 0:
-        fee = min(fee, max_fee)
+    if min_fee > 0: fee = max(fee, min_fee)
+    if max_fee > 0: fee = min(fee, max_fee)
     return round(fee)
+
+# ----------------------------- Safe helpers for crash-proof queries
+def safe_query(sql, params=(), default=None):
+    try:
+        return get_db().execute(sql, params).fetchall()
+    except Exception:
+        return default
+
+def safe_count(sql, params=(), default=0):
+    try:
+        row = get_db().execute(sql, params).fetchone()
+        if row is None:
+            return default
+        return row[0] if 0 in range(len(row)) else default
+    except Exception:
+        return default
 
 # ----------------------------- Safe Home + Health
 @app.route("/", methods=["GET"])
@@ -435,21 +457,15 @@ def menu():
         ORDER BY section_id IS NOT NULL DESC, section_id, id DESC;
     """).fetchall()
 
-    items_by_section = {}
-    uncategorized = []
+    items_by_section, uncategorized = {}, []
     for r in rows:
         sid = r["section_id"]
-        if sid:
-            items_by_section.setdefault(sid, []).append(r)
-        else:
-            uncategorized.append(r)
+        (items_by_section.setdefault(sid, []).append(r)) if sid else uncategorized.append(r)
 
-    return render_template(
-        "menu.html",
-        sections=sections,
-        items_by_section=items_by_section,
-        uncategorized=uncategorized,
-    )
+    return render_template("menu.html",
+                           sections=sections,
+                           items_by_section=items_by_section,
+                           uncategorized=uncategorized)
 
 @csrf.exempt
 @app.route("/order", methods=["GET", "POST"])
@@ -524,21 +540,35 @@ def change_password():
 
     return render_template("change_password.html")
 
-# ----------------------------- My Orders (paginated)
+# ----------------------------- My Orders (LEGACY-SAFE + paginated)
 @app.route("/my_orders", methods=["GET"])
 @login_required
 def my_orders():
     db = get_db()
     uid = session["user_id"]
     page, per_page, offset = _get_page_per_page(default_per_page=20, max_per_page=100)
-    total_rows = db.execute("SELECT COUNT(*) AS c FROM orders WHERE user_id=?;", (uid,)).fetchone()["c"]
-    rows = db.execute("""
-        SELECT id, items_json, total, status, created_at, items_total, delivery_fee, service_fee, grand_total
-        FROM orders
-        WHERE user_id = ?
-        ORDER BY id DESC
-        LIMIT ? OFFSET ?;
-    """, (uid, per_page, offset)).fetchall()
+
+    # Try modern columns; fallback if missing
+    try:
+        total_rows = db.execute("SELECT COUNT(*) AS c FROM orders WHERE user_id=?;", (uid,)).fetchone()["c"]
+        rows = db.execute("""
+            SELECT id, items_json, total, status, created_at, items_total, delivery_fee, service_fee, grand_total
+            FROM orders
+            WHERE user_id = ?
+            ORDER BY id DESC
+            LIMIT ? OFFSET ?;
+        """, (uid, per_page, offset)).fetchall()
+        legacy = False
+    except Exception:
+        total_rows = db.execute("SELECT COUNT(*) AS c FROM orders WHERE user_id=?;", (uid,)).fetchone()[0]
+        rows = db.execute("""
+            SELECT id, items_json, total, status, created_at
+            FROM orders
+            WHERE user_id = ?
+            ORDER BY id DESC
+            LIMIT ? OFFSET ?;
+        """, (uid, per_page, offset)).fetchall()
+        legacy = True
 
     orders = []
     for r in rows:
@@ -546,12 +576,19 @@ def my_orders():
             items = json.loads(r["items_json"]) if r["items_json"] else []
         except Exception:
             items = []
-        items_total = float(r["items_total"] or 0)
-        if (items_total == 0) and items:
-            items_total = sum(float(i.get("price",0))*float(i.get("qty",1)) for i in items)
-        delivery_fee = float(r["delivery_fee"] or 0)
-        service_fee  = float(r["service_fee"] or 0)
-        grand_total  = float(r["grand_total"] or 0) or (items_total + delivery_fee + service_fee)
+        if not legacy:
+            items_total = float(r["items_total"] or 0)
+            if (items_total == 0) and items:
+                items_total = sum(float(i.get("price",0))*float(i.get("qty",1)) for i in items)
+            delivery_fee = float(r["delivery_fee"] or 0)
+            service_fee  = float(r["service_fee"] or 0)
+            grand_total  = float(r["grand_total"] or 0) or (items_total + delivery_fee + service_fee)
+        else:
+            items_total = sum(float(i.get("price",0))*float(i.get("qty",1)) for i in items) if items else float(r["total"] or 0)
+            delivery_fee = 0.0
+            service_fee  = 0.0
+            grand_total  = float(r["total"] or items_total)
+
         orders.append({
             "id": r["id"], "items": items, "status": (r["status"] or ""), "created_at": r["created_at"],
             "items_total": items_total, "delivery_fee": delivery_fee, "service_fee": service_fee, "total": grand_total
@@ -565,7 +602,7 @@ def my_orders():
                            orders=orders, total_spent=total_spent,
                            page=page, per_page=per_page, total_pages=total_pages, total_rows=total_rows)
 
-# ----------------------------- Order detail
+# ----------------------------- Order detail (LEGACY-SAFE)
 @app.route("/order/<int:order_id>", methods=["GET"])
 @login_required
 def order_detail(order_id):
@@ -573,7 +610,7 @@ def order_detail(order_id):
     row = db.execute("""
         SELECT o.*, u.name as user_name, u.email as user_email
           FROM orders o LEFT JOIN users u ON u.id=o.user_id
-         WHERE o.id=?
+         WHERE o.id=?;
     """, (order_id,)).fetchone()
     if not row:
         flash("Order not found.", "warning")
@@ -586,12 +623,18 @@ def order_detail(order_id):
         items = json.loads(row["items_json"]) if row["items_json"] else []
     except Exception:
         items = []
-    items_total = float(row["items_total"] or 0)
-    if (items_total == 0) and items:
-        items_total = sum(float(i.get("price",0))*float(i.get("qty",1)) for i in items)
-    delivery_fee = float(row["delivery_fee"] or 0)
-    service_fee  = float(row["service_fee"] or 0)
-    total        = float(row["grand_total"] or 0) or (items_total + delivery_fee + service_fee)
+    try:
+        items_total = float(row["items_total"] or 0)
+        if (items_total == 0) and items:
+            items_total = sum(float(i.get("price",0))*float(i.get("qty",1)) for i in items)
+        delivery_fee = float(row["delivery_fee"] or 0)
+        service_fee  = float(row["service_fee"] or 0)
+        total        = float(row["grand_total"] or 0) or (items_total + delivery_fee + service_fee)
+    except Exception:
+        items_total = sum(float(i.get("price",0))*float(i.get("qty",1)) for i in items) if items else float(row["total"] or 0)
+        delivery_fee = 0.0
+        service_fee  = 0.0
+        total        = float(row["total"] or items_total)
 
     order_obj = {
         "id": row["id"], "status": row["status"], "created_at": row["created_at"],
@@ -601,22 +644,45 @@ def order_detail(order_id):
     }
     return render_template("order_detail.html", order=order_obj)
 
-# ----------------------------- Admin panel
+# ----------------------------- Crash-proof Admin dashboard
 @app.route("/admin", methods=["GET"])
 @admin_required
 def admin():
-    db = get_db()
-    items = db.execute("SELECT * FROM menu_items ORDER BY id DESC;").fetchall()
-    page, per_page, offset = _get_page_per_page(default_per_page=50, max_per_page=100)
-    total_orders = db.execute("SELECT COUNT(*) AS c FROM orders;").fetchone()["c"]
-    orders = db.execute(
-        "SELECT o.*, u.name AS user_name, u.email AS email FROM orders o LEFT JOIN users u ON u.id=o.user_id ORDER BY o.id DESC LIMIT ? OFFSET ?;",
-        (per_page, offset)
-    ).fetchall()
-    total_pages = max(1, (total_orders + per_page - 1) // per_page)
-    return render_template("admin.html",
-                           items=items, orders=orders,
-                           page=page, per_page=per_page, total_pages=total_pages, total_orders=total_orders)
+    # Menu items (table/columns missing hon to empty list; page crash nahi karega)
+    items = safe_query("""
+        SELECT 
+          id, 
+          name, 
+          COALESCE(price, 0) AS price, 
+          COALESCE(description, '') AS description,
+          COALESCE(is_active, 1) AS is_active
+        FROM menu_items
+        ORDER BY id DESC
+        LIMIT 100
+    """) or []
+
+    # Recent orders + user info (orders table na ho to khali)
+    orders = safe_query("""
+        SELECT 
+          o.id,
+          COALESCE(o.created_at, '') AS created_at,
+          COALESCE(o.status, 'pending') AS status,
+          COALESCE(o.grand_total, o.total, 0) AS grand_total,
+          u.name  AS user_name,
+          u.email AS email
+        FROM orders o
+        LEFT JOIN users u ON u.id = o.user_id
+        ORDER BY o.id DESC
+        LIMIT 100
+    """) or []
+
+    stats = {
+        "users":  safe_count("SELECT COUNT(1) FROM users"),
+        "items":  safe_count("SELECT COUNT(1) FROM menu_items"),
+        "orders": safe_count("SELECT COUNT(1) FROM orders"),
+    }
+
+    return render_template("admin.html", items=items, orders=orders, stats=stats)
 
 # ----------------------------- Admin: Sections CRUD
 @app.route("/admin/sections", methods=["GET"])
@@ -792,11 +858,7 @@ def admin_order_status(order_id):
         )
     except Exception:
         html = None
-    text_fallback = (
-        f"Hello,\n\nYour order #{order_id} status is now: "
-        f"{nice.get(new_status, new_status.title())}.\n"
-        f"Time: {datetime.datetime.now().isoformat()}\n\nThank you!"
-    )
+    text_fallback = f"Hello,\n\nYour order #{order_id} status is now: {nice.get(new_status, new_status.title())}.\nTime: {datetime.datetime.now().isoformat()}\n\nThank you!"
     ok, err = send_email_safe(to_email, subject, html or text_fallback, text_fallback=text_fallback)
     flash_msg = f"Order {order_id} → {new_status}" + (" (email sent)" if ok else f" (email failed: {err})")
     flash(flash_msg, "success" if ok else "warning")
@@ -833,6 +895,159 @@ def admin_test_email():
     text = "This is a test email from Indian Food App."
     ok, err = send_email_safe(ADMIN_EMAIL_DEFAULT, "Test Email", sample_html or text, text_fallback=text)
     flash("Test email sent!" if ok else f"Email error: {err}", "success" if ok else "danger")
+    return redirect(url_for("admin"))
+
+# ----------------------------- QUICK SEED (admin only)
+@app.route("/admin/seed_menu")
+@admin_required
+def admin_seed_menu():
+    db = get_db()
+    # ensure one section
+    sec = db.execute("SELECT id FROM sections WHERE is_active=1 ORDER BY sort_order DESC, id DESC LIMIT 1").fetchone()
+    if not sec:
+        db.execute("INSERT INTO sections (name, is_active) VALUES (?,1)", ("Popular",))
+        db.commit()
+        sec = db.execute("SELECT id FROM sections WHERE is_active=1 ORDER BY id DESC LIMIT 1").fetchone()
+    sec_id = sec["id"]
+    # seed only if empty
+    cnt = db.execute("SELECT COUNT(*) c FROM menu_items WHERE is_active=1").fetchone()["c"]
+    if cnt == 0:
+        db.executemany(
+            "INSERT INTO menu_items (name, description, price, image_url, is_active, section_id) VALUES (?,?,?,?,1,?)",
+            [
+                ("Chicken Biryani", "Spicy basmati rice with chicken", 75000, "", sec_id),
+                ("Paneer Butter Masala", "Creamy tomato curry", 89000, "", sec_id),
+                ("Garlic Naan", "Tandoor-baked flatbread", 25000, "", sec_id),
+            ],
+        )
+        db.commit()
+        flash("Seeded 3 demo items.", "success")
+    else:
+        flash("Menu already has items.", "info")
+    return redirect(url_for("menu"))
+
+# ----------------------------- BACKUP & RESTORE (JSON)  — /var/data/menu_backup.json
+@app.route("/admin/backup_menu")
+@admin_required
+def admin_backup_menu():
+    db = get_db()
+    obj = {
+        "when": datetime.datetime.now().isoformat(),
+        "sections": [dict(r) for r in db.execute("SELECT * FROM sections ORDER BY id;").fetchall()],
+        "menu_items": [dict(r) for r in db.execute("SELECT * FROM menu_items ORDER BY id;").fetchall()],
+    }
+    try:
+        with open(MENU_BACKUP_PATH, "w", encoding="utf-8") as f:
+            json.dump(obj, f, ensure_ascii=False, indent=2)
+        flash(f"Backup saved to {MENU_BACKUP_PATH}", "success")
+    except Exception as e:
+        flash(f"Backup error: {e}", "danger")
+    return redirect(url_for("admin_sections"))
+
+@app.route("/admin/restore_menu")
+@admin_required
+def admin_restore_menu():
+    if not os.path.exists(MENU_BACKUP_PATH):
+        flash("Backup file not found.", "warning")
+        return redirect(url_for("admin_sections"))
+    try:
+        with open(MENU_BACKUP_PATH, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        db = get_db()
+        # Merge restore (no deletes) — upsert by name
+        sec_id_map = {}
+        for s in data.get("sections", []):
+            name = (s.get("name") or "").strip()
+            if not name: continue
+            row = db.execute("SELECT id FROM sections WHERE name=?;", (name,)).fetchone()
+            if row:
+                sec_id_map[s["id"]] = row["id"]
+                db.execute("UPDATE sections SET description=?, image_url=?, sort_order=?, is_active=? WHERE id=?;",
+                           (s.get("description"), s.get("image_url"), s.get("sort_order", 0), s.get("is_active", 1), row["id"]))
+            else:
+                cur = db.execute(
+                    "INSERT INTO sections (name, description, image_url, sort_order, is_active) VALUES (?,?,?,?,?);",
+                    (name, s.get("description"), s.get("image_url"), s.get("sort_order", 0), s.get("is_active", 1))
+                )
+                sec_id_map[s["id"]] = cur.lastrowid
+        db.commit()
+
+        for m in data.get("menu_items", []):
+            name = (m.get("name") or "").strip()
+            if not name: continue
+            row = db.execute("SELECT id FROM menu_items WHERE name=?;", (name,)).fetchone()
+            sec_id = None
+            if m.get("section_id") and m["section_id"] in sec_id_map:
+                sec_id = sec_id_map[m["section_id"]]
+            if row:
+                db.execute("""
+                    UPDATE menu_items SET description=?, price=?, image_url=?, is_active=?, section_id=?
+                    WHERE id=?;
+                """, (m.get("description"), m.get("price", 0.0), m.get("image_url"),
+                      m.get("is_active", 1), sec_id, row["id"]))
+            else:
+                db.execute("""
+                    INSERT INTO menu_items (name, description, price, image_url, is_active, section_id)
+                    VALUES (?,?,?,?,?,?);
+                """, (name, m.get("description"), m.get("price", 0.0), m.get("image_url"),
+                      m.get("is_active", 1), sec_id))
+        db.commit()
+        flash("Restore completed (merged, no deletions).", "success")
+    except Exception as e:
+        flash(f"Restore error: {e}", "danger")
+    return redirect(url_for("admin_sections"))
+
+# ----------------------------- DIAG (read-only) + SELF-GRANT (safe)
+@csrf.exempt
+@app.route("/admin/diag")
+@login_required
+def admin_diag():
+    db = get_db()
+    def _count(q):
+        try:
+            return db.execute(q).fetchone()[0]
+        except Exception:
+            return None
+    try:
+        tpl_dir = os.path.join(BASE_DIR, "templates")
+        tpl_list = sorted([n for n in os.listdir(tpl_dir) if n.endswith(".html")])[:100]
+    except Exception:
+        tpl_list = []
+    try:
+        db_exists = os.path.exists(DB_PATH)
+        db_size = (os.path.getsize(DB_PATH) if db_exists else 0)
+    except Exception:
+        db_exists, db_size = False, 0
+    info = {
+        "db_path": DB_PATH,
+        "db_exists": db_exists,
+        "db_size_bytes": db_size,
+        "sections": _count("SELECT COUNT(*) FROM sections;"),
+        "menu_items": _count("SELECT COUNT(*) FROM menu_items;"),
+        "orders": _count("SELECT COUNT(*) FROM orders;"),
+        "admins": _count("SELECT COUNT(*) FROM users WHERE is_admin=1;"),
+        "you": {"id": session.get("user_id"), "email": session.get("email"), "is_admin": bool(session.get("is_admin"))},
+        "templates": tpl_list,
+    }
+    return jsonify(info), 200
+
+@csrf.exempt
+@app.route("/admin/self_grant")
+@login_required
+def admin_self_grant():
+    db = get_db()
+    admins = db.execute("SELECT COUNT(*) FROM users WHERE is_admin=1;").fetchone()[0]
+    if admins and not session.get("is_admin"):
+        flash("Admin already exists — please ask an admin to grant access.", "warning")
+        return redirect(url_for("login"))
+    uid = session.get("user_id")
+    if not uid:
+        flash("Please log in first.", "warning")
+        return redirect(url_for("login"))
+    db.execute("UPDATE users SET is_admin=1 WHERE id=?;", (uid,))
+    db.commit()
+    session["is_admin"] = True
+    flash("You now have admin access.", "success")
     return redirect(url_for("admin"))
 
 # ----------------------------- Public JSON APIs
@@ -1072,6 +1287,35 @@ def api_order_status(order_id):
     return jsonify({"ok": True, "order_id": order_id,
                     "status": row["status"], "driver_status": row["driver_status"], "driver_id": row["driver_id"]})
 
+# ----------------------------- Legacy-friendly orders table view (for templates/orders.html)
+@app.route("/orders", methods=["GET"])
+@admin_required
+def orders_legacy_table():
+    db = get_db()
+    rows = db.execute("""
+        SELECT o.id, o.items_json, u.name AS customer_name
+          FROM orders o LEFT JOIN users u ON u.id = o.user_id
+         ORDER BY o.id DESC
+         LIMIT 500;
+    """).fetchall()
+
+    out_rows = []
+    for r in rows:
+        cust = r["customer_name"] or "Guest"
+        try:
+            items = json.loads(r["items_json"]) if r["items_json"] else []
+        except Exception:
+            items = []
+        if not items:
+            out_rows.append({"id": r["id"], "customer_name": cust, "item": "", "quantity": 0})
+            continue
+        for it in items:
+            name = (it.get("name") if isinstance(it, dict) else "") or ""
+            qty = int(it.get("qty", 1) if isinstance(it, dict) else 1)
+            out_rows.append({"id": r["id"], "customer_name": cust, "item": name, "quantity": qty})
+
+    return render_template("orders.html", orders=out_rows)
+
 # ----------------------------- Register page
 @csrf.exempt
 @limiter.limit("5 per minute")
@@ -1105,6 +1349,11 @@ def page_not_found(e):
 
 @app.errorhandler(500)
 def internal_error(e):
+    # Optional: log to console
+    try:
+        app.logger.exception("500 error: %s", e)
+    except Exception:
+        print("500:", e)
     return render_template("500.html"), 500
 
 if __name__ == "__main__":
