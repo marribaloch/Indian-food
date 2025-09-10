@@ -1,43 +1,26 @@
 {% extends "layout.html" %}
-{% block title %}My Orders · Indian Food App{% endblock %}
+{% block title %}My Orders{% endblock %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
   <h2 class="mb-0">My Orders</h2>
-  <div>
-    <a href="{{ url_for('menu') }}" class="btn btn-outline-secondary btn-sm">Back to Menu</a>
-  </div>
+  <a href="{{ url_for('menu') }}" class="btn btn-outline-secondary btn-sm">Back to Menu</a>
 </div>
-
 <div class="card shadow-sm">
   <div class="table-responsive">
     <table class="table table-hover align-middle mb-0">
-      <thead class="table-light">
-        <tr>
-          <th>#</th>
-          <th>Total</th>
-          <th>Status</th>
-          <th>Placed</th>
-          <th></th>
-        </tr>
-      </thead>
+      <thead class="table-light"><tr><th>#</th><th>Total</th><th>Status</th><th>Placed</th><th></th></tr></thead>
       <tbody>
-        {% for o in orders %}
+      {% for o in orders %}
         <tr>
           <td>{{ o.id }}</td>
           <td>{{ (o.total or 0)|vnd }}</td>
-          <td>
-            <span class="badge text-bg-{% if o.status=='pending' %}warning{% elif o.status=='confirmed' %}info{% elif o.status=='preparing' %}secondary{% elif o.status=='out_for_delivery' %}primary{% elif o.status=='delivered' %}success{% else %}light{% endif %}">
-              {{ o.status|replace('_',' ')|title }}
-            </span>
-          </td>
-          <td class="text-nowrap">{{ o.created_at or o.placed_at or '' }}</td>
-          <td class="text-end">
-            <a href="{{ url_for('order_detail', order_id=o.id) }}" class="btn btn-sm btn-outline-primary">Details</a>
-          </td>
+          <td><span class="badge text-bg-{% if o.status=='pending' %}warning{% elif o.status=='confirmed' %}info{% elif o.status=='preparing' %}secondary{% elif o.status=='out_for_delivery' %}primary{% elif o.status=='delivered' %}success{% else %}light{% endif %}">{{ o.status|replace('_',' ')|title }}</span></td>
+          <td class="text-nowrap">{{ o.created_at or '' }}</td>
+          <td class="text-end"><a href="{{ url_for('order_detail', order_id=o.id) }}" class="btn btn-sm btn-outline-primary">Details</a></td>
         </tr>
-        {% else %}
+      {% else %}
         <tr><td colspan="5" class="text-center text-muted">You have no orders yet.</td></tr>
-        {% endfor %}
+      {% endfor %}
       </tbody>
     </table>
   </div>

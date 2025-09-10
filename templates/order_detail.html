@@ -1,15 +1,13 @@
 {% extends "layout.html" %}
-{% block title %}Order #{{ order.id }} · Indian Food App{% endblock %}
+{% block title %}Order #{{ order.id }}{% endblock %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
   <h2 class="mb-0">Order #{{ order.id }}</h2>
-  <div class="d-flex gap-2">
-    {% if session.get('is_admin') %}
-      <a href="{{ url_for('admin_orders') if 'admin_orders' in globals() else url_for('admin') }}" class="btn btn-outline-secondary btn-sm">Back</a>
-    {% else %}
-      <a href="{{ url_for('my_orders') }}" class="btn btn-outline-secondary btn-sm">My Orders</a>
-    {% endif %}
-  </div>
+  {% if session.get('is_admin') %}
+    <a href="{{ url_for('admin') }}" class="btn btn-outline-secondary btn-sm">Back</a>
+  {% else %}
+    <a href="{{ url_for('my_orders') }}" class="btn btn-outline-secondary btn-sm">My Orders</a>
+  {% endif %}
 </div>
 
 <div class="row g-4">
@@ -17,19 +15,11 @@
     <div class="card shadow-sm h-100">
       <div class="card-header"><strong>Items</strong></div>
       <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0">
-          <thead class="table-light">
-            <tr>
-              <th>#</th>
-              <th>Item</th>
-              <th class="text-center">Qty</th>
-              <th class="text-end">Price</th>
-              <th class="text-end">Subtotal</th>
-            </tr>
-          </thead>
+        <table class="table table-hover mb-0">
+          <thead class="table-light"><tr><th>#</th><th>Item</th><th class="text-center">Qty</th><th class="text-end">Price</th><th class="text-end">Subtotal</th></tr></thead>
           <tbody>
-            {% set grand = 0 %}
-            {% for li in order.items %}
+          {% set grand=0 %}
+          {% for li in order.items %}
             {% set sub = (li.price or 0) * (li.qty or 1) %}
             {% set grand = grand + sub %}
             <tr>
@@ -39,14 +29,9 @@
               <td class="text-end">{{ (li.price or 0)|vnd }}</td>
               <td class="text-end">{{ sub|vnd }}</td>
             </tr>
-            {% endfor %}
+          {% endfor %}
           </tbody>
-          <tfoot class="table-light">
-            <tr>
-              <th colspan="4" class="text-end">Total</th>
-              <th class="text-end">{{ (order.total or grand)|vnd }}</th>
-            </tr>
-          </tfoot>
+          <tfoot class="table-light"><tr><th colspan="4" class="text-end">Total</th><th class="text-end">{{ (order.total or grand)|vnd }}</th></tr></tfoot>
         </table>
       </div>
     </div>
@@ -56,30 +41,11 @@
     <div class="card shadow-sm mb-4">
       <div class="card-header"><strong>Summary</strong></div>
       <div class="card-body">
-        <div class="row mb-2">
-          <div class="col-4 text-muted">Customer</div>
-          <div class="col-8">{{ order.customer_name or order.user_name or '—' }}</div>
+        <div class="row mb-2"><div class="col-4 text-muted">Customer</div><div class="col-8">{{ order.user_name or '—' }}</div></div>
+        <div class="row mb-2"><div class="col-4 text-muted">Status</div>
+          <div class="col-8"><span class="badge text-bg-{% if order.status=='pending' %}warning{% elif order.status=='confirmed' %}info{% elif order.status=='preparing' %}secondary{% elif order.status=='out_for_delivery' %}primary{% elif order.status=='delivered' %}success{% else %}light{% endif %}">{{ order.status|replace('_',' ')|title }}</span></div>
         </div>
-        <div class="row mb-2">
-          <div class="col-4 text-muted">Phone</div>
-          <div class="col-8">{{ order.phone or '—' }}</div>
-        </div>
-        <div class="row mb-2">
-          <div class="col-4 text-muted">Address</div>
-          <div class="col-8">{{ order.address or '—' }}</div>
-        </div>
-        <div class="row mb-2 align-items-center">
-          <div class="col-4 text-muted">Status</div>
-          <div class="col-8">
-            <span class="badge text-bg-{% if order.status=='pending' %}warning{% elif order.status=='confirmed' %}info{% elif order.status=='preparing' %}secondary{% elif order.status=='out_for_delivery' %}primary{% elif order.status=='delivered' %}success{% else %}light{% endif %}">
-              {{ order.status|replace('_',' ')|title }}
-            </span>
-          </div>
-        </div>
-        <div class="row">
-          <div class="col-4 text-muted">Placed</div>
-          <div class="col-8">{{ order.created_at or order.placed_at or '' }}</div>
-        </div>
+        <div class="row"><div class="col-4 text-muted">Placed</div><div class="col-8">{{ order.created_at or '' }}</div></div>
       </div>
     </div>
 
@@ -87,24 +53,17 @@
     <div class="card shadow-sm">
       <div class="card-header"><strong>Update Status (Admin)</strong></div>
       <div class="card-body">
-        <form method="post" action="{{ url_for('order_detail', order_id=order.id) }}">
+        <form method="post" action="{{ url_for('admin_order_status', order_id=order.id) }}">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <div class="mb-3">
             <label class="form-label">Status</label>
-            <select name="status" class="form-select" required>
-              {% for s in ['pending','confirmed','preparing','out_for_delivery','delivered','cancelled'] %}
+            <select class="form-select" name="status">
+              {% for s in ['pending','confirmed','preparing','out_for_delivery','ready','delivered','cancelled'] %}
                 <option value="{{ s }}" {% if order.status==s %}selected{% endif %}>{{ s|replace('_',' ')|title }}</option>
               {% endfor %}
             </select>
           </div>
-          <div class="mb-3">
-            <label class="form-label">Admin Note (optional)</label>
-            <textarea name="admin_note" class="form-control" rows="2" placeholder="Note for log / email"></textarea>
-          </div>
-          <div class="d-flex gap-2">
-            <button class="btn btn-primary">Save</button>
-            <a class="btn btn-outline-secondary" href="{{ url_for('admin_orders') if 'admin_orders' in globals() else url_for('admin') }}">Cancel</a>
-          </div>
+          <button class="btn btn-primary">Save</button>
         </form>
       </div>
     </div>

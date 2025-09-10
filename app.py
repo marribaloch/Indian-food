@@ -1,14 +1,12 @@
-<<<<<<< HEAD
 # app.py — Indian Food App (+ Sections/Categories support)
 # PERSISTENT DB + SEED + BACKUP/RESTORE + LEGACY-SAFE
-# Changes vs purana:
+# Changes:
 #  - CSRF helper now single-call: use {{ csrf_token() }} in templates
-#  - /admin uses crash-proof queries (no 500 if some cols missing)
-#  - Small helpers (safe_query/safe_count) & a few tidy-ups
+#  - Admin dashboard uses crash-proof queries (no 500 if some cols missing)
+#  - Safe helpers (safe_query/safe_count)
+#  - Persistent DB path: ENV DB_PATH -> /var/data -> ./data
+#  - Menu backup/restore JSON
 
-=======
-# app.py — Indian Food App (+ Sections/Categories support) [PERSISTENT DB + SEED]
->>>>>>> 072459a5eab4df5a3919ad60b169c806c8965892
 import os, json, sqlite3, datetime, smtplib, shutil, math, urllib.parse, urllib.request
 from email.message import EmailMessage
 from functools import wraps
@@ -46,50 +44,34 @@ csrf = CSRFProtect(app)
 # --- CSRF token in Jinja (use {{ csrf_token() }})
 @app.context_processor
 def inject_csrf():
-    # standard: single call returns token string
+    # single call returns token string
     return dict(csrf_token=generate_csrf)
 
 limiter = Limiter(get_remote_address, app=app, default_limits=["200 per day", "50 per hour"])
 
-<<<<<<< HEAD
-# ------------------ Paths / Persistent DB (waada: /var/data/app.db on server)
-BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-VAR_DATA_DIR = "/var/data"  # render disk mount
-if os.path.isdir(VAR_DATA_DIR):
-    os.makedirs(VAR_DATA_DIR, exist_ok=True)
-    DB_PATH = os.path.join(VAR_DATA_DIR, "app.db")
-    MENU_BACKUP_PATH = os.path.join(VAR_DATA_DIR, "menu_backup.json")
-else:
-    local_data_dir = os.path.join(BASE_DIR, "data")
-    os.makedirs(local_data_dir, exist_ok=True)
-    DB_PATH = os.path.join(local_data_dir, "app.db")
-    MENU_BACKUP_PATH = os.path.join(local_data_dir, "menu_backup.json")
-
-=======
-# ------------------ Paths / Persistent DB (single source of truth)
+# ------------------ Paths / Persistent DB (ENV -> /var/data -> ./data)
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
-# Preferred: explicit DB_PATH (e.g., /data/app.db on Render Disk)
-DB_PATH = os.environ.get("DB_PATH")
-
-# Backward compatibility: DATA_DIR + DB_NAME from your previous config
+DB_PATH = os.environ.get("DB_PATH")  # prefer explicit env if provided
 if not DB_PATH:
-    DB_NAME  = os.environ.get("DB_NAME", "app.db")
-    DATA_DIR = os.environ.get("DATA_DIR")  # old style
-    if DATA_DIR:
-        # Ensure dir exists
-        try:
-            os.makedirs(DATA_DIR, exist_ok=True)
-        except Exception:
-            pass
-        DB_PATH = os.path.join(DATA_DIR, DB_NAME)
+    VAR_DATA_DIR = "/var/data"  # Render disk mount
+    if os.path.isdir(VAR_DATA_DIR):
+        os.makedirs(VAR_DATA_DIR, exist_ok=True)
+        DB_PATH = os.path.join(VAR_DATA_DIR, "app.db")
+        MENU_BACKUP_PATH = os.path.join(VAR_DATA_DIR, "menu_backup.json")
     else:
-        # Local default: ./data/app.db
         local_data_dir = os.path.join(BASE_DIR, "data")
         os.makedirs(local_data_dir, exist_ok=True)
-        DB_PATH = os.path.join(local_data_dir, DB_NAME)
+        DB_PATH = os.path.join(local_data_dir, "app.db")
+        MENU_BACKUP_PATH = os.path.join(local_data_dir, "menu_backup.json")
+else:
+    # If DB_PATH came from env, keep backup JSON in same dir
+    try:
+        os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+    except Exception:
+        pass
+    MENU_BACKUP_PATH = os.path.join(os.path.dirname(DB_PATH), "menu_backup.json")
 
->>>>>>> 072459a5eab4df5a3919ad60b169c806c8965892
 # If a legacy DB sat in BASE_DIR, copy it once to the new place (first run only)
 legacy_db = os.path.join(BASE_DIR, os.environ.get("DB_NAME", "app.db"))
 if (DB_PATH and not os.path.exists(DB_PATH)) and os.path.exists(legacy_db):
@@ -99,6 +81,7 @@ if (DB_PATH and not os.path.exists(DB_PATH)) and os.path.exists(legacy_db):
     except Exception:
         pass
 
+# ------------------ CORS (for mobile app/API)
 ALLOWED_ORIGINS = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "").split(",") if o.strip()]
 if not ALLOWED_ORIGINS:
     ALLOWED_ORIGINS = ["http://localhost:3000", "http://127.0.0.1:3000"]
@@ -121,6 +104,7 @@ def add_cors_headers(resp):
         pass
     return resp
 
+# ------------------ Email settings
 EMAIL_HOST = os.getenv("EMAIL_HOST") or os.getenv("EMAIL_SERVER") or os.getenv("SMTP_HOST") or "smtp.gmail.com"
 EMAIL_PORT = int(os.getenv("EMAIL_PORT") or os.getenv("SMTP_PORT") or 587)
 EMAIL_USER = os.getenv("EMAIL_USER") or os.getenv("SMTP_USER")
@@ -128,24 +112,22 @@ EMAIL_PASS = os.getenv("EMAIL_PASSWORD") or os.getenv("SMTP_PASS")
 FROM_EMAIL = os.getenv("FROM_EMAIL") or (EMAIL_USER or "no-reply@example.com")
 ADMIN_EMAIL_DEFAULT = os.getenv("ADMIN_EMAIL") or (EMAIL_USER or "admin@example.com")
 
+# ------------------ Fees config
 DELIVERY_FEE_MODE    = (os.getenv("DELIVERY_FEE_MODE") or "flat").lower()
 DELIVERY_FEE_FLAT    = float(os.getenv("DELIVERY_FEE_FLAT") or 0)
 SERVICE_FEE_PERCENT  = float(os.getenv("SERVICE_FEE_PERCENT") or 0)
 
 DELIVERY_BASE_FEE = float(os.getenv("DELIVERY_BASE_FEE") or 0)
-DELIVERY_PER_KM   = float(os.getenv("DELIVERY_PER_KM") or 0)
-DELIVERY_PER_MIN  = float(os.getenv("DELIVERY_PER_MIN") or 0)
-DELIVERY_MIN_FEE  = float(os.getenv("DELIVERY_MIN_FEE") or 0)
-DELIVERY_MAX_FEE  = float(os.getenv("DELIVERY_MAX_FEE") or 0)
+DELIVERY_PER_KM   = float(os.getenv("DELIVERY_PER_KM")   or 0)
+DELIVERY_PER_MIN  = float(os.getenv("DELIVERY_PER_MIN")  or 0)
+DELIVERY_MIN_FEE  = float(os.getenv("DELIVERY_MIN_FEE")  or 0)
+DELIVERY_MAX_FEE  = float(os.getenv("DELIVERY_MAX_FEE")  or 0)
 GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY")
 
 # ----------------------------- DB Helpers
 def get_db():
     if "db" not in g:
-<<<<<<< HEAD
-=======
         # check_same_thread False for gunicorn workers
->>>>>>> 072459a5eab4df5a3919ad60b169c806c8965892
         g.db = sqlite3.connect(DB_PATH, detect_types=sqlite3.PARSE_DECLTYPES, check_same_thread=False)
         g.db.row_factory = sqlite3.Row
     return g.db
@@ -682,7 +664,7 @@ def order_detail(order_id):
 @app.route("/admin", methods=["GET"])
 @admin_required
 def admin():
-    # Menu items (table/columns missing hon to empty list; page crash nahi karega)
+    # Menu items (page crash nahi karega)
     items = safe_query("""
         SELECT 
           id, 
@@ -695,7 +677,7 @@ def admin():
         LIMIT 100
     """) or []
 
-    # Recent orders + user info (orders table na ho to khali)
+    # Recent orders + user info
     orders = safe_query("""
         SELECT 
           o.id,
@@ -960,8 +942,7 @@ def admin_seed_menu():
         flash("Menu already has items.", "info")
     return redirect(url_for("menu"))
 
-<<<<<<< HEAD
-# ----------------------------- BACKUP & RESTORE (JSON)  — /var/data/menu_backup.json
+# ----------------------------- BACKUP & RESTORE (JSON)
 @app.route("/admin/backup_menu")
 @admin_required
 def admin_backup_menu():
@@ -1032,17 +1013,12 @@ def admin_restore_menu():
         flash(f"Restore error: {e}", "danger")
     return redirect(url_for("admin_sections"))
 
-=======
->>>>>>> 072459a5eab4df5a3919ad60b169c806c8965892
 # ----------------------------- DIAG (read-only) + SELF-GRANT (safe)
 @csrf.exempt
 @app.route("/admin/diag")
 @login_required
 def admin_diag():
-<<<<<<< HEAD
-=======
     """Read-only health report."""
->>>>>>> 072459a5eab4df5a3919ad60b169c806c8965892
     db = get_db()
     def _count(q):
         try:
@@ -1076,10 +1052,7 @@ def admin_diag():
 @app.route("/admin/self_grant")
 @login_required
 def admin_self_grant():
-<<<<<<< HEAD
-=======
     """Promote current logged-in user to admin ONLY if there is no admin in DB."""
->>>>>>> 072459a5eab4df5a3919ad60b169c806c8965892
     db = get_db()
     admins = db.execute("SELECT COUNT(*) FROM users WHERE is_admin=1;").fetchone()[0]
     if admins and not session.get("is_admin"):
@@ -1332,7 +1305,7 @@ def api_order_status(order_id):
     return jsonify({"ok": True, "order_id": order_id,
                     "status": row["status"], "driver_status": row["driver_status"], "driver_id": row["driver_id"]})
 
-# ----------------------------- Legacy-friendly orders table view (for templates/orders.html)
+# ----------------------------- Legacy-friendly orders table view
 @app.route("/orders", methods=["GET"])
 @admin_required
 def orders_legacy_table():
@@ -1394,7 +1367,6 @@ def page_not_found(e):
 
 @app.errorhandler(500)
 def internal_error(e):
-    # Optional: log to console
     try:
         app.logger.exception("500 error: %s", e)
     except Exception:

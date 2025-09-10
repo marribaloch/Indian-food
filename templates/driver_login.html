@@ -1,0 +1,26 @@
+{% extends "layout.html" %}
+{% block title %}Driver Login{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-6">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h3 class="mb-3">Driver Login</h3>
+        <div id="msg" class="alert d-none"></div>
+        <div class="mb-3"><label class="form-label">Email</label><input class="form-control" id="email" type="email"></div>
+        <div class="mb-3"><label class="form-label">Password</label><input class="form-control" id="password" type="password"></div>
+        <button class="btn btn-primary" id="btnLogin">Login</button>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+document.getElementById('btnLogin').onclick=async()=>{
+  const res = await fetch('/api/driver/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:email.value,password:password.value})});
+  const data = await res.json(); const msg=document.getElementById('msg');
+  if(!data.ok){ msg.className='alert alert-danger'; msg.textContent=data.error||'Login failed'; msg.classList.remove('d-none'); return; }
+  localStorage.setItem('driver', JSON.stringify(data.driver));
+  location.href='/driver_dashboard';
+};
+</script>
+{% endblock %}

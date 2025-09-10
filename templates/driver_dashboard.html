@@ -1,0 +1,38 @@
+{% extends "layout.html" %}
+{% block title %}Driver Dashboard{% endblock %}
+{% block content %}
+<h2 class="mb-3">Driver Dashboard</h2>
+<div class="d-flex gap-2 mb-3">
+  <button class="btn btn-outline-primary btn-sm" id="btnAvail">Toggle Availability</button>
+  <button class="btn btn-outline-secondary btn-sm" id="btnRefresh">Refresh</button>
+  <span id="state" class="badge text-bg-secondary">Offline</span>
+</div>
+<div class="card shadow-sm">
+  <div class="card-body">
+    <h5>Open Orders</h5>
+    <div id="orders">Loading...</div>
+  </div>
+</div>
+<script>
+let available=false;
+async function fetchOpen(){
+  const res=await fetch('/api/open_orders'); const data=await res.json();
+  if(!data.ok){ orders.textContent='Error'; return; }
+  orders.innerHTML = (data.orders||[]).map(o=>`
+    <div class="border rounded p-2 mb-2 d-flex justify-content-between align-items-center">
+      <div>#${o.id} · ${o.status} · ${Math.round(o.total||0)} VND · ${o.created_at||''}</div>
+      <a class="btn btn-sm btn-outline-primary" href="/order/${o.id}">View</a>
+    </div>`).join('') || '<div class="text-muted">No open orders.</div>';
+}
+async function toggleAvail(){
+  available=!available; state.className='badge ' + (available?'text-bg-success':'text-bg-secondary');
+  state.textContent= available? 'Available':'Offline';
+  const drv = JSON.parse(localStorage.getItem('driver')||'{}');
+  const pos = await new Promise(r=>navigator.geolocation?.getCurrentPosition(p=>r(p),_=>r(null),{maximumAge:6e5,timeout:5e3}) );
+  const lat = pos?.coords?.latitude, lng = pos?.coords?.longitude;
+  await fetch('/api/driver/available',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({driver_id:drv.id,available,lat,lng})});
+}
+btnAvail.onclick=toggleAvail; btnRefresh.onclick=fetchOpen;
+fetchOpen();
+</script>
+{% endblock %}
